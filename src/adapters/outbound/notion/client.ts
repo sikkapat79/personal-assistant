@@ -30,8 +30,10 @@ export interface TodosColumns {
   done: string;
 }
 
-/** When set, the TODOs "done" column is a Status (select) instead of a checkbox. This is the option name that means done (e.g. "DONE", "Closed"). */
-export type TodosDoneKind = { type: 'checkbox' } | { type: 'status'; doneValue: string; openValue: string };
+/** When set, the TODOs "done" column is a Status (select) instead of a checkbox. Option names for done, open, and optionally in_progress. */
+export type TodosDoneKind =
+  | { type: 'checkbox' }
+  | { type: 'status'; doneValue: string; openValue: string; inProgressValue?: string };
 
 /** DB metadata for both Notion databases, loaded from .env (IDs + column mapping). */
 export interface NotionDbMetadata {
@@ -105,6 +107,7 @@ export interface NotionSettingsShape {
   NOTION_TODOS_STATUS?: string;
   NOTION_TODOS_DONE_VALUE?: string;
   NOTION_TODOS_OPEN_VALUE?: string;
+  NOTION_TODOS_IN_PROGRESS_VALUE?: string;
 }
 
 function buildNotionConfigFrom(s: NotionSettingsShape): NotionConfig {
@@ -144,8 +147,9 @@ function buildNotionConfigFrom(s: NotionSettingsShape): NotionConfig {
     done: s.NOTION_TODOS_STATUS ?? defaultDoneColumn,
   };
   const openValue = s.NOTION_TODOS_OPEN_VALUE ?? defaultOpenValue;
+  const inProgressValue = s.NOTION_TODOS_IN_PROGRESS_VALUE;
   const doneKind: TodosDoneKind = useStatus
-    ? { type: 'status', doneValue: doneValue!, openValue }
+    ? { type: 'status', doneValue: doneValue!, openValue, inProgressValue }
     : { type: 'checkbox' };
   return {
     apiKey,
@@ -192,6 +196,7 @@ export function loadNotionConfig(): NotionConfig {
     NOTION_TODOS_STATUS: process.env.NOTION_TODOS_STATUS,
     NOTION_TODOS_DONE_VALUE: process.env.NOTION_TODOS_DONE_VALUE,
     NOTION_TODOS_OPEN_VALUE: process.env.NOTION_TODOS_OPEN_VALUE,
+    NOTION_TODOS_IN_PROGRESS_VALUE: process.env.NOTION_TODOS_IN_PROGRESS_VALUE,
   };
   return buildNotionConfigFrom(s);
 }
@@ -206,12 +211,12 @@ export async function fetchDatabasePropertyNames(
   return 'properties' in db ? Object.keys(db.properties) : [];
 }
 
-/** If the given property in the TODOs DB is a select/status type, return openValue and doneValue from its options (first = open, last = done). */
+/** If the given property in the TODOs DB is a select/status type, return openValue, doneValue, and optionally inProgressValue (first = open, last = done, middle = in_progress when 3 options). */
 export async function fetchTodosDoneOptions(
   client: ReturnType<typeof getNotionClient>,
   databaseId: string,
   doneColumnName: string
-): Promise<{ doneValue: string; openValue: string } | null> {
+): Promise<{ doneValue: string; openValue: string; inProgressValue?: string } | null> {
   const db = await client.databases.retrieve({ database_id: databaseId });
   const props = 'properties' in db ? (db as { properties: Record<string, unknown> }).properties : undefined;
   if (!props || !(doneColumnName in props)) return null;
@@ -220,7 +225,10 @@ export async function fetchTodosDoneOptions(
   if (!Array.isArray(options) || options.length < 2) return null;
   const names = options.map((o) => (o?.name ?? '')).filter(Boolean);
   if (names.length < 2) return null;
-  return { openValue: names[0]!, doneValue: names[names.length - 1]! };
+  const openValue = names[0]!;
+  const doneValue = names[names.length - 1]!;
+  const inProgressValue = names.length === 3 ? names[1] : undefined;
+  return { openValue, doneValue, inProgressValue };
 }
 
 export interface ColumnMappingEntry {

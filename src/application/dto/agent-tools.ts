@@ -77,7 +77,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'add_todo',
     description:
-      'Add a single task. Always set category (Work, Health, Personal, Learning); infer from context if user does not say. Add notes when the user gives context or something to remember. Params: title, category (required), due_date (optional, YYYY-MM-DD), notes (optional), priority (optional: High, Medium, Low).',
+      'Add a single task. Always set category (Work, Health, Personal, Learning); infer from context if user does not say. Add notes when the user gives context or something to remember. Use status "In Progress" when the user says to start working on it. Params: title, category (required), due_date (optional, YYYY-MM-DD), notes (optional), priority (optional: High, Medium, Low), status (optional: Todo, In Progress, Done; default Todo).',
     parameters: {
       type: 'object',
       properties: {
@@ -86,6 +86,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
         due_date: { type: 'string' },
         notes: { type: 'string' },
         priority: { type: 'string', enum: [...TODO_PRIORITIES] },
+        status: { type: 'string', enum: ['Todo', 'In Progress', 'Done'] },
       },
       required: ['title', 'category'],
     },
@@ -93,7 +94,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'add_todos',
     description:
-      'Add multiple tasks in one call. Every task must have a category (Work, Health, Personal, Learning); add notes when the user gives context or reminders. Params: tasks (array of { title, category, due_date?, notes?, priority? }). After adding, confirm how many tasks you added.',
+      'Add multiple tasks in one call. Every task must have a category (Work, Health, Personal, Learning); add notes when the user gives context or reminders. Use status "In Progress" for any task the user says to start. Params: tasks (array of { title, category, due_date?, notes?, priority?, status? }). After adding, confirm how many tasks you added.',
     parameters: {
       type: 'object',
       properties: {
@@ -107,6 +108,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
               due_date: { type: 'string' },
               notes: { type: 'string' },
               priority: { type: 'string', enum: [...TODO_PRIORITIES] },
+              status: { type: 'string', enum: ['Todo', 'In Progress', 'Done'] },
             },
             required: ['title', 'category'],
           },
@@ -118,7 +120,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'update_todo',
     description:
-      'Update an existing task by id or 1-based index. Call this when the user asks to change a task\'s priority, due date, title, category, or notes (e.g. "set task 1 to high priority", "change priority of the first todo to Medium"). Only include the field(s) to change. Params: id_or_index (required; use 1-based index from list_todos, e.g. "1" for first task), title (optional), category (optional), due_date (optional, YYYY-MM-DD or empty to clear), notes (optional), priority (optional: High, Medium, Low).',
+      'Update an existing task by id or 1-based index. Call this when the user asks to change a task\'s priority, due date, title, category, notes, or status (e.g. "set task 1 to high priority", "start working on task 2" → status In Progress). Tasks have status: Todo, In Progress, Done. Only include the field(s) to change. Params: id_or_index (required; use 1-based index from list_todos, e.g. "1" for first task), title (optional), category (optional), due_date (optional, YYYY-MM-DD or empty to clear), notes (optional), priority (optional: High, Medium, Low), status (optional: Todo, In Progress, Done).',
     parameters: {
       type: 'object',
       properties: {
@@ -128,6 +130,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
         due_date: { type: 'string' },
         notes: { type: 'string' },
         priority: { type: 'string', enum: [...TODO_PRIORITIES] },
+        status: { type: 'string', enum: ['Todo', 'In Progress', 'Done'] },
       },
       required: ['id_or_index'],
     },

@@ -2,10 +2,13 @@ import type { ILogsRepository } from '../ports/ILogsRepository';
 import type { ITodosRepository } from '../ports/ITodosRepository';
 import type { IAgentContextPort } from '../ports/IAgentContextPort';
 import type { ILLMPort, ChatMessage } from '../ports/ILLMPort';
-import type { TodoPriority, TodoCategory } from '../../domain/entities/Todo';
+import type { TodoPriority, TodoCategory, TodoStatus } from '../../domain/entities/Todo';
+import type { DailyLog } from '../../domain/entities/DailyLog';
+import type { Todo } from '../../domain/entities/Todo';
 import { TODO_PRIORITIES } from '../../domain/entities/Todo';
 import type { LogInputDto } from '../dto/log-dto';
 import { AGENT_TOOLS } from '../dto/agent-tools';
+import { AGENT_NAME } from '../../config/branding';
 import { LogUseCase } from './log-use-case';
 import { TodosUseCase } from './todos-use-case';
 
@@ -24,6 +27,14 @@ function parseCategory(value: unknown): TodoCategory {
   if (typeof value !== 'string') return DEFAULT_CATEGORY;
   const c = value as TodoCategory;
   return VALID_CATEGORIES.includes(c) ? c : DEFAULT_CATEGORY;
+}
+
+const VALID_STATUSES: TodoStatus[] = ['Todo', 'In Progress', 'Done'];
+function parseStatus(value: unknown): TodoStatus {
+  if (typeof value !== 'string') return 'Todo';
+  const s = value.trim();
+  const match = VALID_STATUSES.find((x) => x.toLowerCase() === s.toLowerCase());
+  return match ?? 'Todo';
 }
 
 export interface ToolCall {
@@ -79,9 +90,14 @@ export class AgentUseCase {
   private static readonly MAX_TOOL_ROUNDS = 5;
 
   async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
-    const ctx = await this.context.getContext();
     const todayDate = new Date().toISOString().slice(0, 10);
-    const systemPrompt = buildSystemPrompt(ctx, todayDate);
+    const [ctx, todayLog, openTodos] = await Promise.all([
+      this.context.getContext(),
+      this.logs.findByDate(todayDate),
+      this.todos.listOpen(),
+    ]);
+    const currentState = buildCurrentStateSnapshot(todayDate, todayLog, openTodos);
+    const systemPrompt = buildSystemPrompt(ctx, todayDate, currentState);
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...history,
@@ -312,8 +328,10 @@ export class AgentUseCase {
         const dueDate = args.due_date ? String(args.due_date) : null;
         const notes = args.notes !== undefined && args.notes !== '' ? String(args.notes) : undefined;
         const priority = parsePriority(args.priority);
-        await todosUseCase.add({ title, category, dueDate, notes, priority });
+        const status = parseStatus(args.status);
+        await todosUseCase.add({ title, category, dueDate, notes, priority, status });
         const parts = [`Added "${title}" [${category}]`];
+        if (status !== 'Todo') parts.push(status);
         if (dueDate) parts.push(`due ${dueDate}`);
         if (notes) parts.push('with notes');
         if (priority) parts.push(priority);
@@ -334,9 +352,11 @@ export class AgentUseCase {
               ? String((t as { notes: unknown }).notes)
               : undefined;
             const priority = parsePriority((t as { priority?: unknown }).priority);
+            const status = parseStatus((t as { status?: unknown }).status);
             if (title) {
-              await todosUseCase.add({ title, category, dueDate, notes, priority });
+              await todosUseCase.add({ title, category, dueDate, notes, priority, status });
               const extra: string[] = [];
+              if (status !== 'Todo') extra.push(status);
               if (dueDate) extra.push(`due ${dueDate}`);
               if (notes) extra.push('notes');
               if (priority) extra.push(priority);
@@ -355,12 +375,14 @@ export class AgentUseCase {
           dueDate?: string | null;
           notes?: string;
           priority?: ReturnType<typeof parsePriority>;
+          status?: TodoStatus;
         } = {};
         if (args.title !== undefined && args.title !== '') patch.title = String(args.title);
         if (args.category !== undefined) patch.category = parseCategory(args.category);
         if (args.due_date !== undefined) patch.dueDate = args.due_date === '' ? null : String(args.due_date);
         if (args.notes !== undefined) patch.notes = String(args.notes);
         if (args.priority !== undefined) patch.priority = parsePriority(args.priority);
+        if (args.status !== undefined) patch.status = parseStatus(args.status);
         if (Object.keys(patch).length === 0) return 'No changes given for that task.';
         await todosUseCase.updateByIdOrIndex(idOrIndex, patch);
         const parts = ['Updated that task'];
@@ -369,6 +391,7 @@ export class AgentUseCase {
         if (patch.dueDate !== undefined) parts.push(patch.dueDate ? `due ${patch.dueDate}` : 'cleared due date');
         if (patch.notes !== undefined) parts.push('notes');
         if (patch.priority) parts.push(`priority ${patch.priority}`);
+        if (patch.status) parts.push(`status ${patch.status}`);
         return parts.join('; ') + '.';
       }
       case 'delete_todo': {
@@ -387,29 +410,55 @@ export class AgentUseCase {
   }
 }
 
+function buildCurrentStateSnapshot(todayDate: string, todayLog: DailyLog | null, openTodos: Todo[]): string {
+  const lines: string[] = [];
+  if (todayLog === null) {
+    lines.push(`Today's log: none yet. (User has not created a log for ${todayDate}.)`);
+  } else {
+    const c = todayLog.content;
+    const parts = ["Today's log: exists."];
+    if (c.title) parts.push(`Title: "${c.title}"`);
+    if (c.mood != null) parts.push(`mood ${c.mood}/5`);
+    if (c.energy != null) parts.push(`energy ${c.energy}/10`);
+    if (c.score != null) parts.push(`score ${c.score}/10`);
+    lines.push(parts.join('. '));
+  }
+  if (openTodos.length === 0) {
+    lines.push('Open tasks: none.');
+  } else {
+    const preview = openTodos.slice(0, 5).map((t, i) => `${i + 1}. ${t.title}`).join('; ');
+    lines.push(`Open tasks: ${openTodos.length} (${preview}${openTodos.length > 5 ? '…' : ''}).`);
+  }
+  return lines.join('\n');
+}
+
 function buildSystemPrompt(
   ctx: { rules: string; docs: string[]; skills: string[] },
-  todayDate: string
+  todayDate: string,
+  currentState: string
 ): string {
   const parts = [
     '## Persona',
-    'You are a friendly, calm personal assistant—like a helpful friend who remembers their journal and tasks. Talk like a real person: warm and natural, not like a bot. Avoid stiff or robotic replies (e.g. "Task added.", "Done.", or repeating back exactly what they said). No canned phrases, bullet lists, or templates unless the user asks. Respond from the conversation and what you just did; keep it human and concise.',
+    `You are ${AGENT_NAME}, a friendly, calm personal assistant—like a helpful friend who remembers their journal and tasks. Talk like a real person: warm and natural, not like a bot. Avoid stiff or robotic replies (e.g. "Task added.", "Done.", or repeating back exactly what they said). No canned phrases, bullet lists, or templates unless the user asks. Respond from the conversation and what you just did; keep it human and concise.`,
     '',
     '## Context',
-    `Today's date is ${todayDate}. Use get_logs with from and to equal this date to see if a log exists for today.`,
+    `Today's date is ${todayDate}. Use get_logs when you need full log text or other dates; the snapshot below is a quick view of today.`,
+    '',
+    '## Current state (use this to reason; call tools when you need to read or change data)',
+    currentState,
     '',
     '## Data',
     'Every field in their logs and tasks is meaningful to them. Preserve existing data: only update the specific field(s) the user mentioned or provided; never clear or overwrite other fields. When summarizing or referring to their day, do not drop or ignore any field they care about (sleep, mood, score, workout, hours, tasks done/undone, etc.). For how to update logs without bugs (single-field vs summarize, which fields to send), follow the **Rules** and **Docs** below—they are the source of truth.',
     '',
     '## Your jobs',
-    '1. **Tasks (to-do list)** – Add, list, update, complete, and delete tasks. Use add_todo or add_todos, update_todo, delete_todo, complete_todo. Never put tasks in the journal. Keep tasks out of log updates. **When the user asks to change a task\'s priority (or due date, title, etc.), you MUST call update_todo with id_or_index and the new value—calling only list_todos does not update the task.**',
+    '1. **Tasks (to-do list)** – Each task has a **status**: Todo, In Progress, Done. Add, list, update, complete, and delete tasks. Use add_todo or add_todos (optional status: Todo, In Progress, Done), update_todo (can set status—e.g. "start task 1" → status In Progress), delete_todo, complete_todo (marks Done). Never put tasks in the journal. **When the user asks to change a task\'s priority, due date, title, category, notes, or status, you MUST call update_todo with id_or_index and the new value—calling only list_todos does not update the task.**',
     '2. **Journal (daily log)** – One log per calendar day. Use **apply_log_update** for all log writes (do not use upsert_log for journal updates). Three modes: **create** (when no log exists—requires sleep_notes, mood, energy; ask user only for sleep and mood; **derive energy from daily check-in** (sleep, mood, yesterday\'s overview), do not ask for energy); **single_field** (when log exists and user mentioned one thing—field + value only); **summarize** (when log exists and end of day or user asks—all of score, title, went_well, improve, gratitude, tomorrow, energy). If get_logs shows no log for that date, create first with mode create; only then use single_field or summarize. See **Rules** and **Docs** for the full procedure.',
     '3. **Task extraction** – You can extract as many tasks as the user mentions. Every task must have a category (Work, Health, Personal, Learning)—always set it; infer from context if the user does not say. Add due_date when they mention a date; add notes when they give context or something to remember about the task (notes help remind them). Set priority when they say it or infer from urgency. After adding, confirm how many tasks you added.',
     '4. **Delete task** – When the user wants to delete or remove a task, first identify it (e.g. by listing and matching title or index). Then ask for confirmation by stating the exact task title: "Do you want to delete the task \'…\'?" Only call delete_todo after they confirm (yes, please, etc.).',
     '5. **Summarize** – When user says they\'re wrapping up or asks for a summary, **first** load that day\'s tasks to analyze: call list_todos with include_done: true and for_date: <the log date> to get all tasks due that day (done and undone). Use that list to fill went_well, improve, tomorrow, and to report done & undone in your reply. Then call apply_log_update with mode summarize (log must already exist; create first if not) with all required fields. Gratitude: capture their words; tomorrow: your reprioritized recommendation from that day\'s tasks and context.',
     '6. **New day** – When they open the app or start chatting and there is no log for today, you can offer a brief line (e.g. today\'s focus or one-line yesterday) and help them get oriented; if no log for today, ask for a **daily check-in** (see 7).',
     '7. **No log for today** – If get_logs shows no log for today, ask the user for a **daily check-in** (sleep and mood). Do not ask for energy; derive it and call apply_log_update with mode create. Do **not** append a check-in question to every reply—only when there is no log for today or they ask to create today\'s log. When you call create, follow the **Daily check-in / create** rules below (use only what they said; no inventing).',
-    '8. **Single-field and tasks** – When the user mentions only one log thing (e.g. "I did a workout", "worked 5 hours"), use apply_log_update with mode single_field and that field + value. Same for tasks: when they ask to change a task\'s priority, due date, title, category, or notes, call **update_todo** with id_or_index (e.g. "1" for first open task) and only that field (e.g. priority: "High"). Do not only list tasks—call update_todo to apply the change.',
+    '8. **Single-field and tasks** – When the user mentions only one log thing (e.g. "I did a workout", "worked 5 hours"), use apply_log_update with mode single_field and that field + value. Same for tasks: when they ask to change a task\'s priority, due date, title, category, notes, or status (Todo / In Progress / Done), call **update_todo** with id_or_index (e.g. "1" for first task) and only that field (e.g. priority: "High", or status: "In Progress" for "start task 1"). Do not only list tasks—call update_todo to apply the change.',
     '9. **Energy budget** – The energy field is the **energy budget for that day** (1–10). Do **not** ask the user for it. It comes from **daily check-in**: derive from sleep (notes), mood, and optionally yesterday\'s overview (get_logs for yesterday). When updating energy later, use yesterday\'s overview as one input.',
     '',
     '## Daily check-in / create (no hallucination)',

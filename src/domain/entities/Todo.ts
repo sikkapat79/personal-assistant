@@ -4,7 +4,8 @@ import type { TodoDueDate } from '../value-objects/TodoDueDate';
 import { createTodoTitle } from '../value-objects/TodoTitle';
 import { createTodoDueDate } from '../value-objects/TodoDueDate';
 
-export type TodoStatus = 'open' | 'done';
+/** Aligned with Notion Status options: Todo, In Progress, Done. */
+export type TodoStatus = 'Todo' | 'In Progress' | 'Done';
 
 export type TodoCategory = 'Work' | 'Health' | 'Personal' | 'Learning';
 
@@ -28,7 +29,7 @@ export function createTodo(
   title: TodoTitle | string,
   dueDate?: TodoDueDate | string | null,
   id?: TodoId,
-  status: TodoStatus = 'open',
+  status: TodoStatus = 'Todo',
   opts?: { category?: TodoCategory; notes?: string; priority?: TodoPriority }
 ): Todo {
   const t = typeof title === 'string' ? createTodoTitle(title) : title;
@@ -45,6 +46,6 @@ export function createTodo(
 }
 
 export function completeTodo(todo: Todo): Todo {
-  if (todo.status === 'done') return todo;
-  return { ...todo, status: 'done' as TodoStatus };
+  if (todo.status === 'Done') return todo;
+  return { ...todo, status: 'Done' as TodoStatus };
 }

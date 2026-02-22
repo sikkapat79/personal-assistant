@@ -1,5 +1,6 @@
 import prompts from 'prompts';
 import { compose } from '../../../composition';
+import { AGENT_NAME } from '../../../config/branding';
 import { todayLogDate } from '../../../domain/value-objects/LogDate';
 import { createSpinner, say, sayDone, sayError } from './ui';
 
@@ -12,7 +13,7 @@ export async function runInteractive(): Promise<void> {
     { title: 'List TODOs', value: 'todos-list' },
     { title: 'Add TODO', value: 'todos-add' },
     { title: 'Today summary', value: 'today' },
-    { title: 'Talk to agent', value: 'agent' },
+    { title: `Talk to ${AGENT_NAME}`, value: 'agent' },
     { title: 'Exit', value: 'exit' },
   ];
 
@@ -100,7 +101,7 @@ async function runChoice(choice: Choice): Promise<void> {
     case 'agent': {
       const { agentUseCase } = compose();
       const { default: prompts } = await import('prompts');
-      say('Agent (type "exit" to return to menu)\n');
+      say(`${AGENT_NAME} (type "exit" to return to menu)\n`);
       const history: { role: 'user' | 'assistant'; content: string }[] = [];
       while (true) {
         const { input } = await prompts({ type: 'text', name: 'input', message: 'You:' });
@@ -113,7 +114,7 @@ async function runChoice(choice: Choice): Promise<void> {
           spinner.stop();
           history.push({ role: 'user', content: line });
           history.push({ role: 'assistant', content: reply });
-          say('Agent: ' + reply + '\n');
+          say(`${AGENT_NAME}: ` + reply + '\n');
         } catch (err) {
           spinner.fail('');
           sayError(err instanceof Error ? err.message : String(err));

@@ -28,6 +28,7 @@ export interface Settings {
   NOTION_TODOS_STATUS?: string;
   NOTION_TODOS_DONE_VALUE?: string;
   NOTION_TODOS_OPEN_VALUE?: string;
+  NOTION_TODOS_IN_PROGRESS_VALUE?: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
 }

@@ -2,7 +2,7 @@ import type {
   ITodosRepository,
   TodoUpdatePatch,
 } from '../../../application/ports/ITodosRepository';
-import type { Todo } from '../../../domain/entities/Todo';
+import type { Todo, TodoStatus } from '../../../domain/entities/Todo';
 import type { TodoId } from '../../../domain/value-objects/TodoId';
 import type { TodoCategory, TodoPriority } from '../../../domain/entities/Todo';
 import type { TodosColumns, TodosDoneKind } from './client';
@@ -51,7 +51,12 @@ export class NotionTodosAdapter implements ITodosRepository {
             filter: statusFilter,
             sorts: [{ property: c.dueDate, direction: 'ascending' }],
           });
-          const statusKind: TodosDoneKind = { type: 'status', doneValue: inferred.doneValue, openValue: inferred.openValue };
+          const statusKind: TodosDoneKind = {
+            type: 'status',
+            doneValue: inferred.doneValue,
+            openValue: inferred.openValue,
+            inProgressValue: inferred.inProgressValue,
+          };
           this.resolvedDoneKind = statusKind;
           return retryRes.results.map((p) => pageToTodo(p, c, statusKind)).filter(Boolean) as Todo[];
         }
@@ -75,8 +80,17 @@ export class NotionTodosAdapter implements ITodosRepository {
     const kind = this.getDoneKind();
     const doneProp =
       kind.type === 'checkbox'
-        ? { checkbox: false }
-        : { select: { name: kind.openValue } };
+        ? { checkbox: todo.status === 'Done' }
+        : {
+            select: {
+              name:
+                todo.status === 'Done'
+                  ? kind.doneValue
+                  : todo.status === 'In Progress' && kind.inProgressValue
+                    ? kind.inProgressValue
+                    : kind.openValue,
+            },
+          };
     const props: Record<string, unknown> = {
       [c.title]: { title: [{ text: { content: todo.title } }] },
       [c.done]: doneProp,
@@ -93,7 +107,7 @@ export class NotionTodosAdapter implements ITodosRepository {
       todo.title,
       todo.dueDate,
       createTodoId(page.id),
-      'open',
+      todo.status,
       { category: todo.category, notes: todo.notes, priority: todo.priority }
     );
   }
@@ -113,6 +127,7 @@ export class NotionTodosAdapter implements ITodosRepository {
 
   async update(id: TodoId, patch: TodoUpdatePatch): Promise<void> {
     const c = this.columns;
+    const kind = this.getDoneKind();
     const props: Record<string, unknown> = {};
     if (patch.title !== undefined) props[c.title] = { title: [{ text: { content: patch.title } }] };
     if (patch.dueDate !== undefined)
@@ -120,6 +135,19 @@ export class NotionTodosAdapter implements ITodosRepository {
     if (patch.category !== undefined) props[c.category] = selectProp(patch.category);
     if (patch.notes !== undefined) props[c.notes] = richTextProp(patch.notes);
     if (patch.priority !== undefined) props[c.priority] = selectProp(patch.priority);
+    if (patch.status !== undefined) {
+      if (kind.type === 'checkbox') {
+        props[c.done] = { checkbox: patch.status === 'Done' };
+      } else {
+        const name =
+          patch.status === 'Done'
+            ? kind.doneValue
+            : patch.status === 'In Progress' && kind.inProgressValue
+              ? kind.inProgressValue
+              : kind.openValue;
+        props[c.done] = { select: { name } };
+      }
+    }
     if (Object.keys(props).length === 0) return;
     await this.client.pages.update({
       page_id: id,
@@ -132,6 +160,13 @@ export class NotionTodosAdapter implements ITodosRepository {
   }
 }
 
+function selectValueToStatus(selectValue: string | undefined, doneKind: TodosDoneKind): TodoStatus {
+  if (doneKind.type === 'checkbox') return selectValue ? 'Done' : 'Todo';
+  if (selectValue === doneKind.doneValue) return 'Done';
+  if (doneKind.inProgressValue && selectValue === doneKind.inProgressValue) return 'In Progress';
+  return 'Todo';
+}
+
 function pageToTodo(
   page: { id: string; object: string; properties?: Record<string, unknown> },
   c: TodosColumns,
@@ -141,14 +176,14 @@ function pageToTodo(
   const props = page.properties ?? {};
   const title = extractTitle(props[c.title]);
   const due = extractDate(props[c.dueDate]);
-  const done =
+  const status: TodoStatus =
     doneKind.type === 'checkbox'
-      ? extractCheckbox(props[c.done])
-      : extractSelect(props[c.done]) === doneKind.doneValue;
+      ? (extractCheckbox(props[c.done]) ? 'Done' : 'Todo')
+      : selectValueToStatus(extractSelect(props[c.done]), doneKind);
   const category = extractSelect(props[c.category]) as TodoCategory | undefined;
   const priority = extractSelect(props[c.priority]) as TodoPriority | undefined;
   const notes = extractRichText(props[c.notes]) || undefined;
-  return createTodo(title, due ?? null, createTodoId(page.id), done ? 'done' : 'open', {
+  return createTodo(title, due ?? null, createTodoId(page.id), status, {
     category,
     notes,
     priority,

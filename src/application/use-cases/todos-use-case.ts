@@ -18,7 +18,7 @@ export class TodosUseCase {
   }
 
   async add(input: TodoAddInputDto): Promise<TodoItemDto> {
-    const todo = createTodo(input.title, input.dueDate ?? null, undefined, 'open', {
+    const todo = createTodo(input.title, input.dueDate ?? null, undefined, input.status ?? 'Todo', {
       category: input.category,
       notes: input.notes,
       priority: input.priority,

@@ -12,24 +12,68 @@ import {
   suggestColumnMapping,
   type ColumnMappingEntry,
 } from '../../../adapters/outbound/notion/client';
+import { AGENT_NAME, AGENT_TAGLINE } from '../../../config/branding';
+import { designTokens } from '../../../design-tokens';
 
 /** Frame-based spinner for loading/thinking. */
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const SPINNER_TICK_MS = 150;
 
 const TIPS = [
-  'Type a message and press Enter to talk to the agent.',
+  `Type a message and press Enter to talk to ${AGENT_NAME}.`,
   'Try "what are my open todos?" or "log today: shipped the feature".',
   '? for shortcuts · Ctrl+P: Profile & Settings · Ctrl+C to exit',
 ];
 
-const ROBOT = `
-  ▄▄▄▄▄
-  █   █
-  █ ◠ ◠ █
-  █   █
-  ▀▀▀▀▀
-`.trim();
+/** Animation tick for Pax face (slower than spinner so it stays calm). */
+const PAX_ANIMATION_TICK_MS = 400;
+
+type PaxMood = 'neutral' | 'thinking' | 'laughing' | 'loading' | 'sad';
+
+/** Pax mascot: calm, observant look (ASCII-safe, thick border). Uniform 2-space indent, no extra gaps. */
+const PAX_FACES: Record<PaxMood, readonly string[]> = {
+  neutral: [
+    '  +-----+\n  ( . . )\n  \\ - /\n  +-----+',
+    '  +-----+\n  ( - - )\n  \\ - /\n  +-----+',
+  ],
+  thinking: [
+    '  +-----+\n  ( . . )\n  \\ ~ /\n  +-----+',
+    '  +-----+\n  (   . )\n  \\ ~ /\n  +-----+',
+    '  +-----+\n  ( .   )\n  \\ ~ /\n  +-----+',
+  ],
+  laughing: [
+    '  +-----+\n  ( . . )\n  \\ _ /\n  +-----+',
+    '  +-----+\n  ( . . )\n  \\___/\n  +-----+',
+  ],
+  loading: [
+    '  +-----+\n  ( - - )\n  \\ . /\n  +-----+',
+    '  +-----+\n  ( . . )\n  \\ . /\n  +-----+',
+  ],
+  sad: [
+    '  +-----+\n  ( . . )\n  \\ v /\n  +-----+',
+    '  +-----+\n  ( \' \' )\n  \\ v /\n  +-----+',
+  ],
+};
+
+/** Returns current animated frame for the given mood (cycles on an interval). */
+function usePaxAnimationFrame(mood: PaxMood): string {
+  const [frame, setFrame] = useState(0);
+  const frames = PAX_FACES[mood];
+  useEffect(() => setFrame(0), [mood]);
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => (f + 1) % frames.length), PAX_ANIMATION_TICK_MS);
+    return () => clearInterval(id);
+  }, [mood, frames.length]);
+  return frames[frame % frames.length];
+}
+
+function getPaxMood(thinking: boolean, todayLog: DailyLog | null | 'loading', todayLogLoadError: string | null, errorMessage: string | null, lastReply: string | null): PaxMood {
+  if (thinking) return 'thinking';
+  if (todayLog === 'loading') return 'loading';
+  if (todayLogLoadError || errorMessage) return 'sad';
+  if (lastReply !== null) return 'laughing';
+  return 'neutral';
+}
 
 const FAKE_ENV_HINT =
   'To try without Notion: NOTION_API_KEY=x NOTION_LOGS_DATABASE_ID=x NOTION_TODOS_DATABASE_ID=x bun run tui';
@@ -112,7 +156,7 @@ type Page = 'main' | 'settings';
 
 // Ask for the “brain” (OpenAI agent) first, then Notion data sources.
 const SETUP_STEPS: { key: keyof import('../../../config/settings').Settings; label: string }[] = [
-  { key: 'OPENAI_API_KEY', label: 'OpenAI API key (optional, for the journal agent)' },
+  { key: 'OPENAI_API_KEY', label: `OpenAI API key (optional, for ${AGENT_NAME})` },
   { key: 'OPENAI_MODEL', label: 'OpenAI model (optional, e.g. gpt-4o-mini)' },
   { key: 'NOTION_API_KEY', label: 'Notion API key (from notion.so/my-integrations)' },
   { key: 'NOTION_LOGS_DATABASE_ID', label: 'Notion Logs database ID (from the database URL)' },
@@ -132,7 +176,7 @@ function FirstRunSetupContent({
   return (
     <box style={{ flexDirection: 'column', padding: 1 }}>
       <text style={{ attributes: TextAttributes.BOLD }}>First-run setup</text>
-      <text fg="#888888">Enter required settings. They will be saved to ~/.pa/settings.json</text>
+      <text fg={designTokens.color.muted}>Enter required settings. They will be saved to ~/.pa/settings.json</text>
       <box style={{ marginTop: 1, flexDirection: 'column' }}>
         <text style={{ attributes: TextAttributes.BOLD }}>
           Step {setupStep + 1} of {SETUP_STEPS.length}: {step.label}
@@ -142,7 +186,7 @@ function FirstRunSetupContent({
         </box>
       </box>
       <box style={{ marginTop: 1 }}>
-        <text fg="#888888">Press Enter to save and continue. Esc: skip (you can set later)</text>
+        <text fg={designTokens.color.muted}>Press Enter to save and continue. Esc: skip (you can set later)</text>
       </box>
     </box>
   );
@@ -154,10 +198,10 @@ function ColumnScanningContent({ spinner }: { spinner: string }) {
   return (
     <box style={{ flexDirection: 'column', padding: 1 }}>
       <text style={{ attributes: TextAttributes.BOLD }}>Connecting to Notion</text>
-      <text fg="#888888">Scanning databases and matching columns…</text>
+      <text fg={designTokens.color.muted}>Scanning databases and matching columns…</text>
       <box style={{ marginTop: 1 }}>
-        <text fg="#00FFFF">{spinner}</text>
-        <text fg="#888888"> Please wait.</text>
+        <text fg={designTokens.color.loading}>{spinner}</text>
+        <text fg={designTokens.color.muted}> Please wait.</text>
       </box>
     </box>
   );
@@ -179,14 +223,14 @@ function ColumnMappingContent({
   return (
     <box style={{ flexDirection: 'column', padding: 1 }}>
       <text style={{ attributes: TextAttributes.BOLD }}>Confirm column mapping</text>
-      <text fg="#888888">Enter = accept suggested, or type a different property name.</text>
+      <text fg={designTokens.color.muted}>Enter = accept suggested, or type a different property name.</text>
       <box style={{ marginTop: 1, flexDirection: 'column' }}>
         <text style={{ attributes: TextAttributes.BOLD }}>
           Field {index + 1} of {total}: {label} → suggested: {row.suggested}
         </text>
         {purpose ? (
           <box style={{ marginTop: 0 }}>
-            <text fg="#888888">Purpose: {purpose}</text>
+            <text fg={designTokens.color.muted}>Purpose: {purpose}</text>
           </box>
         ) : null}
         <box style={{ flexDirection: 'row', marginTop: 0 }}>
@@ -194,7 +238,7 @@ function ColumnMappingContent({
         </box>
       </box>
       <box style={{ marginTop: 1 }}>
-        <text fg="#888888">Press Enter to use suggested or your typed name. Esc: skip column setup.</text>
+        <text fg={designTokens.color.muted}>Press Enter to use suggested or your typed name. Esc: skip column setup.</text>
       </box>
     </box>
   );
@@ -215,22 +259,22 @@ function SettingsPageContent({
       <text style={{ attributes: TextAttributes.BOLD }}>Profile & Settings</text>
       <box style={{ marginTop: 1, flexDirection: 'column' }}>
         <text style={{ attributes: TextAttributes.BOLD }}>Profile</text>
-        <text fg="#888888">Display name (Enter to save):</text>
+        <text fg={designTokens.color.muted}>Display name (Enter to save):</text>
         <box style={{ flexDirection: 'row', marginTop: 0 }}>
           <text>{'> ' + displayNameInput + '▌'}</text>
         </box>
-        <text fg="#888888">Current: {resolved.profile.displayName}</text>
+        <text fg={designTokens.color.muted}>Current: {resolved.profile.displayName}</text>
       </box>
       <box style={{ marginTop: 1, flexDirection: 'column' }}>
         <text style={{ attributes: TextAttributes.BOLD }}>Settings</text>
-        <text fg="#888888">Notion API key: {maskSecret(s.NOTION_API_KEY)}</text>
-        <text fg="#888888">Logs DB ID: {s.NOTION_LOGS_DATABASE_ID || 'Not set'}</text>
-        <text fg="#888888">TODOs DB ID: {s.NOTION_TODOS_DATABASE_ID || 'Not set'}</text>
-        <text fg="#888888">OpenAI API key: {maskSecret(s.OPENAI_API_KEY)}</text>
-        <text fg="#888888">OpenAI model: {s.OPENAI_MODEL ?? 'gpt-4o-mini'}</text>
+<text fg={designTokens.color.muted}>Notion API key: {maskSecret(s.NOTION_API_KEY)}</text>
+          <text fg={designTokens.color.muted}>Logs DB ID: {s.NOTION_LOGS_DATABASE_ID || 'Not set'}</text>
+          <text fg={designTokens.color.muted}>TODOs DB ID: {s.NOTION_TODOS_DATABASE_ID || 'Not set'}</text>
+          <text fg={designTokens.color.muted}>OpenAI API key: {maskSecret(s.OPENAI_API_KEY)}</text>
+          <text fg={designTokens.color.muted}>OpenAI model: {s.OPENAI_MODEL ?? 'gpt-4o-mini'}</text>
       </box>
       <box style={{ marginTop: 1 }}>
-        <text fg="#888888">Edit ~/.pa/settings.json or set env vars. Ctrl+P or Esc: Back to main</text>
+        <text fg={designTokens.color.muted}>Edit ~/.pa/settings.json or set env vars. Ctrl+P or Esc: Back to main</text>
       </box>
     </box>
   );
@@ -266,6 +310,8 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
   const spinLoading = useSpinner(todayLog === 'loading');
   const spinThinking = useSpinner(thinking);
   const spinScan = useSpinner(setupPhase === 'scanning');
+  const paxMood = getPaxMood(thinking, todayLog, todayLogLoadError, errorMessage, lastReply);
+  const paxFrame = usePaxAnimationFrame(paxMood);
 
   useEffect(() => {
     if (setupPhase !== 'scanning') return;
@@ -385,7 +431,7 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
       setShowHelp(false);
       return;
     }
-    if (page === 'main' && key.name === '?') {
+    if (page === 'main' && key.name === '?' && input.length === 0) {
       setShowHelp(true);
       return;
     }
@@ -572,10 +618,10 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
     if (columnScanError) {
       return (
         <box style={{ flexDirection: 'column', padding: 1 }}>
-          <text style={{ attributes: TextAttributes.BOLD }} fg="#FF0000">Column scan failed</text>
-          <text fg="#FF0000">{columnScanError}</text>
+          <text style={{ attributes: TextAttributes.BOLD }} fg={designTokens.color.error}>Column scan failed</text>
+          <text fg={designTokens.color.error}>{columnScanError}</text>
           <box style={{ marginTop: 1 }}>
-            <text fg="#888888">Esc: skip column setup and continue. You can edit ~/.pa/settings.json later.</text>
+            <text fg={designTokens.color.muted}>Esc: skip column setup and continue. You can edit ~/.pa/settings.json later.</text>
           </box>
         </box>
       );
@@ -597,13 +643,13 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
   if (error) {
     return (
       <box style={{ flexDirection: 'column', padding: 1 }}>
-        <text fg="#FF0000" style={{ attributes: TextAttributes.BOLD }}>Could not start</text>
-        <text fg="#FF0000">{error}</text>
+        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>Could not start</text>
+        <text fg={designTokens.color.error}>{error}</text>
         <box style={{ marginTop: 1 }}>
-          <text fg="#888888">Press Ctrl+P to open Profile & Settings, or set in .env / ~/.pa/settings.json</text>
+          <text fg={designTokens.color.muted}>Press Ctrl+P to open Profile & Settings, or set in .env / ~/.pa/settings.json</text>
         </box>
         <box style={{ marginTop: 1 }}>
-          <text fg="#888888">{FAKE_ENV_HINT}</text>
+          <text fg={designTokens.color.muted}>{FAKE_ENV_HINT}</text>
         </box>
       </box>
     );
@@ -617,12 +663,18 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
     <box style={{ flexDirection: 'column', padding: 1 }}>
       <box style={{ flexDirection: 'row', marginBottom: 1 }}>
         <box style={{ width: '50%', flexDirection: 'column', paddingRight: 2 }}>
-          <text style={{ attributes: TextAttributes.BOLD }}>PA · Self-discipline journal</text>
-          <text>Welcome back {userName}!</text>
-          <box style={{ marginTop: 1 }}>
-            <text fg="#888888">{ROBOT}</text>
+          <box style={{ flexDirection: 'column', borderStyle: 'single', padding: 1, marginBottom: 1 }}>
+            <text style={{ attributes: TextAttributes.BOLD }}>PA</text>
+            <text fg={designTokens.color.muted}>Self-discipline journal</text>
+            <text>Welcome back, {userName}</text>
+            <box style={{ marginTop: 1 }}>
+              <text fg={designTokens.color.accent}>{paxFrame}</text>
+            </box>
+            <box style={{ flexDirection: 'row' }}>
+              <text fg={designTokens.color.muted}>{AGENT_TAGLINE} · </text>
+              <text fg={designTokens.color.accent}>{AGENT_NAME}</text>
+            </box>
           </box>
-          <text fg="#888888">Notion logs & TODOs · Agent</text>
           <box style={{ marginTop: 1, flexDirection: 'column' }}>
             <text style={{ attributes: TextAttributes.BOLD }}>Last response</text>
             <box style={{ height: LAST_RESPONSE_LINES, overflow: 'hidden', flexDirection: 'column', marginTop: 0 }}>
@@ -634,12 +686,12 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
                 : thinking
                   ? (
                     <>
-                      <text fg="#FFFF00">{spinThinking}</text>
-                      <text fg="#FFFF00"> Thinking…</text>
+                      <text fg={designTokens.color.thinking}>{spinThinking}</text>
+                      <text fg={designTokens.color.thinking}> Thinking…</text>
                     </>
                     )
                   : (
-                      <text fg="#888888">— Ask something to see the agent reply here.</text>
+                      <text fg={designTokens.color.muted}>— Ask something to see {AGENT_NAME} reply here.</text>
                     )}
             </box>
           </box>
@@ -647,38 +699,38 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
             <text style={{ attributes: TextAttributes.BOLD }}>Today</text>
             {todayLog === 'loading' && (
               <>
-                <text fg="#888888">{'\n'}</text>
-                <text fg="#00FFFF">{spinLoading}</text>
-                <text fg="#888888"> Loading…</text>
+                <text fg={designTokens.color.muted}>{'\n'}</text>
+                <text fg={designTokens.color.loading}>{spinLoading}</text>
+                <text fg={designTokens.color.muted}> Loading…</text>
               </>
             )}
             {todayLogLoadError && (
-              <text fg="#FF0000">{'\nError loading: ' + todayLogLoadError}</text>
+              <text fg={designTokens.color.error}>{'\nError loading: ' + todayLogLoadError}</text>
             )}
             {todayLog && todayLog !== 'loading' && !todayLogLoadError && (
-              <text fg="#888888">
+              <text fg={designTokens.color.muted}>
                 {'\n' + (todayLog.content.title || 'Untitled') + (todayLog.content.notes ? ` — ${todayLog.content.notes.slice(0, 50)}${todayLog.content.notes.length > 50 ? '…' : ''}` : '')}
               </text>
             )}
             {!todayLog && !todayLogLoadError && (
-              <text fg="#888888">{"\nNo log for today yet.\nHow did you sleep? How's your mood after waking up?"}</text>
+              <text fg={designTokens.color.muted}>{"\nNo log for today yet.\nHow did you sleep? How's your mood after waking up?"}</text>
             )}
           </box>
         </box>
         <box style={{ width: '50%', flexDirection: 'column', borderStyle: 'single', paddingLeft: 1, paddingRight: 1 }}>
           <text style={{ attributes: TextAttributes.BOLD }}>Tips</text>
           {TIPS.map((t, i) => (
-            <text key={i} fg="#888888">{t}</text>
+            <text key={i} fg={designTokens.color.muted}>{t}</text>
           ))}
           <box style={{ marginTop: 1 }}>
             <text style={{ attributes: TextAttributes.BOLD }}>Recent activity</text>
-            {recent.length > ACTIVITY_VISIBLE_LINES && <text fg="#888888"> ↑↓ scroll</text>}
+            {recent.length > ACTIVITY_VISIBLE_LINES && <text fg={designTokens.color.muted}> ↑↓ scroll</text>}
           </box>
           <box style={{ height: ACTIVITY_VISIBLE_LINES, overflow: 'hidden', flexDirection: 'column' }}>
             {recent.length === 0
-              ? <text fg="#888888">No recent activity</text>
+              ? <text fg={designTokens.color.muted}>No recent activity</text>
               : activityLines.map((line, i) => (
-                  <text key={start + i} fg="#888888">{line}</text>
+                  <text key={start + i} fg={designTokens.color.muted}>{line}</text>
                 ))}
           </box>
         </box>
@@ -688,17 +740,17 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
       </box>
       {errorMessage && (
         <box style={{ marginTop: 1 }}>
-          <text fg="#FF0000">Error: {errorMessage}</text>
+          <text fg={designTokens.color.error}>Error: {errorMessage}</text>
         </box>
       )}
       <box style={{ marginTop: 1, flexDirection: 'row', justifyContent: 'space-between' }}>
-        <text fg="#888888">? for shortcuts</text>
-        {thinking ? <text fg="#FFFF00">{spinThinking} Thinking…</text> : <text fg="#888888">Ready</text>}
+        <text fg={designTokens.color.muted}>? for shortcuts</text>
+        {thinking ? <text fg={designTokens.color.thinking}>{spinThinking} Thinking…</text> : <text fg={designTokens.color.muted}>Ready</text>}
       </box>
       {showHelp && (
         <box style={{ marginTop: 1, borderStyle: 'single', padding: 1, flexDirection: 'column' }}>
           <text style={{ attributes: TextAttributes.BOLD }}>Shortcuts</text>
-          <text fg="#888888">{'\n? - this help\nCtrl+P - Profile & Settings\nCtrl+C - exit\n↑ / ↓ - scroll recent activity\n\nPress any key to close'}</text>
+          <text fg={designTokens.color.muted}>{'\n? - this help\nCtrl+P - Profile & Settings\nCtrl+C - exit\n↑ / ↓ - scroll recent activity\n\nPress any key to close'}</text>
         </box>
       )}
     </box>

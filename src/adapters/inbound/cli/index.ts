@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { compose } from '../../../composition';
+import { AGENT_NAME } from '../../../config/branding';
 import { todayLogDate } from '../../../domain/value-objects/LogDate';
 import { runInteractive } from './interactive';
 import { createSpinner, say, sayError } from './ui';
@@ -91,7 +92,7 @@ async function runAgent(): Promise<void> {
   const { agentUseCase } = compose();
   const readline = await import('readline');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  say('Talk to the agent. (Set OPENAI_API_KEY in .env to use OpenAI)\n');
+  say(`Talk to ${AGENT_NAME}. (Set OPENAI_API_KEY in .env to use OpenAI)\n`);
   const history: { role: 'user' | 'assistant'; content: string }[] = [];
   const loop = (): void => {
     rl.question('You: ', async (line) => {
@@ -107,7 +108,7 @@ async function runAgent(): Promise<void> {
         spinner.stop();
         history.push({ role: 'user', content: input });
         history.push({ role: 'assistant', content: reply });
-        say('Agent: ' + reply + '\n');
+        say(`${AGENT_NAME}: ` + reply + '\n');
       } catch (err) {
         spinner.fail('');
         sayError(err instanceof Error ? err.message : String(err));

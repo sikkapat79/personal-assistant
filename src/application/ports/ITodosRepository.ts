@@ -1,4 +1,4 @@
-import type { Todo, TodoCategory, TodoPriority } from '../../domain/entities/Todo';
+import type { Todo, TodoCategory, TodoPriority, TodoStatus } from '../../domain/entities/Todo';
 import type { TodoId } from '../../domain/value-objects/TodoId';
 
 export interface TodoUpdatePatch {
@@ -7,6 +7,7 @@ export interface TodoUpdatePatch {
   category?: TodoCategory;
   notes?: string;
   priority?: TodoPriority;
+  status?: TodoStatus;
 }
 
 export interface ITodosRepository {
