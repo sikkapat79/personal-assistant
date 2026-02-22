@@ -1,4 +1,4 @@
-# Agent guide (pa – self-discipline journal)
+# Agent guide (Pax – self-discipline journal)
 
 Quick reference for AI agents working on this codebase.
 
