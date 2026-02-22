@@ -89,6 +89,44 @@ export class AgentUseCase {
 
   private static readonly MAX_TOOL_ROUNDS = 5;
 
+  /** Max recent messages to send in full; older messages are summarized when history exceeds this. */
+  private static readonly MAX_RECENT_MESSAGES = 16;
+
+  /**
+   * Returns history to send to the LLM and an optional summary of older turns.
+   * When history exceeds MAX_RECENT_MESSAGES, older part is summarized and only recent messages are kept.
+   */
+  private async buildEffectiveHistory(
+    history: ChatMessage[]
+  ): Promise<{ effectiveHistory: ChatMessage[]; sessionSummary: string | null }> {
+    if (history.length <= AgentUseCase.MAX_RECENT_MESSAGES) {
+      return { effectiveHistory: history, sessionSummary: null };
+    }
+    const oldPart = history.slice(0, history.length - AgentUseCase.MAX_RECENT_MESSAGES);
+    const recent = history.slice(-AgentUseCase.MAX_RECENT_MESSAGES);
+    const sessionSummary = await this.summarizeConversation(oldPart);
+    return { effectiveHistory: recent, sessionSummary };
+  }
+
+  /**
+   * One LLM call (no tools) to summarize older conversation for context.
+   */
+  private async summarizeConversation(messages: ChatMessage[]): Promise<string> {
+    const transcript = messages
+      .map((m) => `${m.role}: ${typeof m.content === 'string' ? m.content : ''}`)
+      .join('\n');
+    const summarizerMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'Summarize this chat in 2–4 short sentences: what was decided, any tasks or todos added, and today\'s focus. Be concise.',
+      },
+      { role: 'user', content: transcript },
+    ];
+    const summary = await this.llm.chat(summarizerMessages);
+    return (summary ?? '').trim() || 'Earlier conversation.';
+  }
+
   async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
     const todayDate = new Date().toISOString().slice(0, 10);
     const [ctx, todayLog, openTodos] = await Promise.all([
@@ -98,9 +136,13 @@ export class AgentUseCase {
     ]);
     const currentState = buildCurrentStateSnapshot(todayDate, todayLog, openTodos);
     const systemPrompt = buildSystemPrompt(ctx, todayDate, currentState);
+    const { effectiveHistory, sessionSummary } = await this.buildEffectiveHistory(history);
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...history,
+      ...(sessionSummary
+        ? [{ role: 'system' as const, content: `Earlier in this session: ${sessionSummary}` }]
+        : []),
+      ...effectiveHistory,
       { role: 'user', content: userMessage },
     ];
     let reply = await this.llm.chat(messages, AGENT_TOOLS);

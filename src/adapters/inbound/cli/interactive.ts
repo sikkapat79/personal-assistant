@@ -107,6 +107,11 @@ async function runChoice(choice: Choice): Promise<void> {
         const { input } = await prompts({ type: 'text', name: 'input', message: 'You:' });
         const line = (input as string)?.trim();
         if (!line || line === 'exit') break;
+        if (line === '/clear') {
+          history.length = 0;
+          say('History cleared.\n');
+          continue;
+        }
         const spinner = createSpinner('Thinking…');
         spinner.start();
         try {

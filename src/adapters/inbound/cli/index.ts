@@ -101,6 +101,12 @@ async function runAgent(): Promise<void> {
         rl.close();
         return;
       }
+      if (input === '/clear') {
+        history.length = 0;
+        say('History cleared.\n');
+        loop();
+        return;
+      }
       const spinner = createSpinner('Thinking…');
       spinner.start();
       try {
