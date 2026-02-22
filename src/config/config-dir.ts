@@ -9,9 +9,10 @@ const PA_DIR = '.pa';
  * Creates the directory if it does not exist.
  */
 export function getConfigDir(): string {
+  const xdg = process.env.XDG_CONFIG_HOME?.trim();
   const dir =
-    platform() === 'linux' && process.env.XDG_CONFIG_HOME
-      ? join(process.env.XDG_CONFIG_HOME, 'pa')
+    platform() === 'linux' && xdg
+      ? join(xdg, 'pa')
       : join(homedir(), PA_DIR);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
