@@ -16,3 +16,13 @@ export function parseStrictYyyyMmDd(value: string): string {
   }
   return d.format(FORMAT);
 }
+
+/**
+ * Accept a string that is either YYYY-MM-DD or an ISO datetime (e.g. with T and time).
+ * Extracts the date part, validates it, and returns normalized YYYY-MM-DD.
+ * Throws if the date part is not a valid calendar date.
+ */
+export function parseIsoDateOrDatetimeToYyyyMmDd(value: string): string {
+  const datePart = value.length >= 10 ? value.slice(0, 10) : value;
+  return parseStrictYyyyMmDd(datePart);
+}
