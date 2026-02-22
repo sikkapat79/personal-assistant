@@ -6,10 +6,12 @@ import { createSpinner, say, sayError } from './ui';
 
 async function ping(): Promise<void> {
   try {
-    const { loadNotionConfig, getNotionClient, validateNotionMapping } = await import(
+    const { getResolvedConfig } = await import('../../../config/resolved');
+    const { getNotionClient, validateNotionMapping, buildNotionConfigFromResolved } = await import(
       '../../../adapters/outbound/notion/client'
     );
-    const config = loadNotionConfig();
+    const { settings } = getResolvedConfig();
+    const config = buildNotionConfigFromResolved(settings);
     const notion = getNotionClient(config.apiKey);
     await validateNotionMapping(config, notion);
     console.log('Logs DB: OK');
@@ -167,8 +169,7 @@ Commands:
   journal todos list [--all] | add "..." [--due date] | complete <id>
   journal today        Today summary
 
-Env: NOTION_API_KEY, NOTION_LOGS_DATABASE_ID, NOTION_TODOS_DATABASE_ID
-See .env.example`);
+Config: run TUI to set up (bun run tui) or set in .env / ~/.pa/settings.json`);
     return;
   }
   if (!cmd) {
@@ -181,8 +182,8 @@ See .env.example`);
 
 main().catch((err) => {
   const msg = err instanceof Error ? err.message : String(err);
-  if (msg.includes('NOTION_') || msg.includes('Missing env')) {
-    sayError('Missing or invalid env. Set NOTION_API_KEY, NOTION_LOGS_DATABASE_ID, NOTION_TODOS_DATABASE_ID. See .env.example');
+  if (msg.includes('NOTION_') || msg.includes('Missing')) {
+    sayError('Missing or invalid config. Run the TUI to set up: bun run tui. Or set in .env / ~/.pa/settings.json');
   } else {
     sayError(msg);
   }

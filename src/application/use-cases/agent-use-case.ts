@@ -3,19 +3,21 @@ import type { ITodosRepository } from '../ports/ITodosRepository';
 import type { IAgentContextPort } from '../ports/IAgentContextPort';
 import type { ILLMPort, ChatMessage } from '../ports/ILLMPort';
 import type { TodoPriority, TodoCategory } from '../../domain/entities/Todo';
+import { TODO_PRIORITIES } from '../../domain/entities/Todo';
 import type { LogInputDto } from '../dto/log-dto';
 import { AGENT_TOOLS } from '../dto/agent-tools';
 import { LogUseCase } from './log-use-case';
 import { TodosUseCase } from './todos-use-case';
 
-const VALID_PRIORITIES: TodoPriority[] = ['High', 'Medium', 'Low'];
 const VALID_CATEGORIES: TodoCategory[] = ['Work', 'Health', 'Personal', 'Learning'];
 const DEFAULT_CATEGORY: TodoCategory = 'Personal';
 
+/** Parses priority from tool/LLM input (case-insensitive); returns canonical TodoPriority or undefined. */
 function parsePriority(value: unknown): TodoPriority | undefined {
   if (typeof value !== 'string') return undefined;
-  const p = value as TodoPriority;
-  return VALID_PRIORITIES.includes(p) ? p : undefined;
+  const normalized = value.trim();
+  const match = TODO_PRIORITIES.find((p) => p.toLowerCase() === normalized.toLowerCase());
+  return match ?? undefined;
 }
 
 function parseCategory(value: unknown): TodoCategory {
@@ -71,6 +73,11 @@ export class AgentUseCase {
     private readonly llm: ILLMPort
   ) {}
 
+  /** Reply that looks like raw tool-call output should never be shown to the user. */
+  private static readonly RAW_TOOL_CALL_PATTERN = /^\s*TOOL_CALLS?:\s*[\s\S]*/i;
+
+  private static readonly MAX_TOOL_ROUNDS = 5;
+
   async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
     const ctx = await this.context.getContext();
     const todayDate = new Date().toISOString().slice(0, 10);
@@ -81,8 +88,10 @@ export class AgentUseCase {
       { role: 'user', content: userMessage },
     ];
     let reply = await this.llm.chat(messages, AGENT_TOOLS);
-    const toolCalls = parseToolCalls(reply);
-    if (toolCalls.length > 0) {
+    let rounds = 0;
+    while (rounds < AgentUseCase.MAX_TOOL_ROUNDS) {
+      const toolCalls = parseToolCalls(reply);
+      if (toolCalls.length === 0) break;
       const results = await this.executeTools(toolCalls);
       const resultText = results.map((r) => `${r.name}: ${r.result}`).join('\n');
       messages.push({ role: 'assistant', content: reply });
@@ -90,7 +99,14 @@ export class AgentUseCase {
         role: 'user',
         content: `Tool results:\n${resultText}`,
       });
+      reply = await this.llm.chat(messages, AGENT_TOOLS);
+      rounds++;
+    }
+    if (reply && AgentUseCase.RAW_TOOL_CALL_PATTERN.test(reply.trim())) {
       reply = await this.llm.chat(messages);
+    }
+    if (!reply || AgentUseCase.RAW_TOOL_CALL_PATTERN.test(reply.trim())) {
+      return "Done. I've taken care of that.";
     }
     return reply;
   }
@@ -265,8 +281,17 @@ export class AgentUseCase {
           : `Updated the log for ${date}${title ? `: "${title}"` : ''}.`;
       }
       case 'list_todos': {
-        const list = args.include_done ? await todosUseCase.listAll() : await todosUseCase.listOpen();
+        let list = args.include_done ? await todosUseCase.listAll() : await todosUseCase.listOpen();
+        const forDate = typeof args.for_date === 'string' && args.for_date.trim() !== '' ? args.for_date.trim() : null;
+        if (forDate) {
+          list = list.filter((t) => t.dueDate === forDate);
+        }
         if (list.length === 0) {
+          if (forDate) {
+            return args.include_done
+              ? `No tasks due on ${forDate} (done or open).`
+              : `No open tasks due on ${forDate}.`;
+          }
           return args.include_done ? 'No TODOs in the list.' : 'No open tasks.';
         }
         const lines = list.map((t, i) => {
@@ -278,7 +303,8 @@ export class AgentUseCase {
           return `${i + 1}. ${t.title}${due}${cat}${pri}${notesHint}${status}`;
         });
         const kind = args.include_done ? 'tasks' : 'open tasks';
-        return `${list.length} ${kind}:\n${lines.join('\n')}`;
+        const scope = forDate ? ` due on ${forDate}` : '';
+        return `${list.length} ${kind}${scope}:\n${lines.join('\n')}`;
       }
       case 'add_todo': {
         const title = String(args.title ?? '');
@@ -376,15 +402,18 @@ function buildSystemPrompt(
     'Every field in their logs and tasks is meaningful to them. Preserve existing data: only update the specific field(s) the user mentioned or provided; never clear or overwrite other fields. When summarizing or referring to their day, do not drop or ignore any field they care about (sleep, mood, score, workout, hours, tasks done/undone, etc.). For how to update logs without bugs (single-field vs summarize, which fields to send), follow the **Rules** and **Docs** below—they are the source of truth.',
     '',
     '## Your jobs',
-    '1. **Tasks (to-do list)** – Add, list, update, complete, and delete tasks. Use add_todo or add_todos, update_todo, delete_todo, complete_todo. Never put tasks in the journal. Keep tasks out of log updates.',
+    '1. **Tasks (to-do list)** – Add, list, update, complete, and delete tasks. Use add_todo or add_todos, update_todo, delete_todo, complete_todo. Never put tasks in the journal. Keep tasks out of log updates. **When the user asks to change a task\'s priority (or due date, title, etc.), you MUST call update_todo with id_or_index and the new value—calling only list_todos does not update the task.**',
     '2. **Journal (daily log)** – One log per calendar day. Use **apply_log_update** for all log writes (do not use upsert_log for journal updates). Three modes: **create** (when no log exists—requires sleep_notes, mood, energy; ask user only for sleep and mood; **derive energy from daily check-in** (sleep, mood, yesterday\'s overview), do not ask for energy); **single_field** (when log exists and user mentioned one thing—field + value only); **summarize** (when log exists and end of day or user asks—all of score, title, went_well, improve, gratitude, tomorrow, energy). If get_logs shows no log for that date, create first with mode create; only then use single_field or summarize. See **Rules** and **Docs** for the full procedure.',
     '3. **Task extraction** – You can extract as many tasks as the user mentions. Every task must have a category (Work, Health, Personal, Learning)—always set it; infer from context if the user does not say. Add due_date when they mention a date; add notes when they give context or something to remember about the task (notes help remind them). Set priority when they say it or infer from urgency. After adding, confirm how many tasks you added.',
     '4. **Delete task** – When the user wants to delete or remove a task, first identify it (e.g. by listing and matching title or index). Then ask for confirmation by stating the exact task title: "Do you want to delete the task \'…\'?" Only call delete_todo after they confirm (yes, please, etc.).',
-    '5. **Summarize** – When user says they\'re wrapping up or asks for a summary, use apply_log_update with mode summarize (log must already exist; create first if not). Fill all required fields; then in your reply give the short overall line and list **done & undone tasks** (list_todos with include_done). Gratitude: capture their words; tomorrow: your reprioritized recommendation from tasks and context.',
-    '6. **New day** – When they are starting the day (e.g. first message, good morning), offer a brief summary (today’s focus or a one-line yesterday) and help them get oriented.',
-    '7. **No log for today** – If get_logs shows no entry for today, ask only for **sleep** (how they slept) and **mood after they woke up**. Do not ask for energy budget. Derive energy from daily check-in (sleep, mood, yesterday\'s overview) and call apply_log_update with mode create (sleep_notes, mood, derived energy). Keep it brief.',
-    '8. **Single-field and tasks** – When the user mentions only one log thing (e.g. "I did a workout", "worked 5 hours"), use apply_log_update with mode single_field and that field + value. Same for tasks: use update_todo with only the property they mentioned.',
-    '9. **Energy budget** – The energy field is the **energy budget for that day** (1–10). Do **not** ask the user for it. It comes from **daily check-in**: derive from sleep (notes), waking mood, and optionally yesterday\'s overview (get_logs for yesterday). When updating energy later, use yesterday\'s overview as one input.',
+    '5. **Summarize** – When user says they\'re wrapping up or asks for a summary, **first** load that day\'s tasks to analyze: call list_todos with include_done: true and for_date: <the log date> to get all tasks due that day (done and undone). Use that list to fill went_well, improve, tomorrow, and to report done & undone in your reply. Then call apply_log_update with mode summarize (log must already exist; create first if not) with all required fields. Gratitude: capture their words; tomorrow: your reprioritized recommendation from that day\'s tasks and context.',
+    '6. **New day** – When they open the app or start chatting and there is no log for today, you can offer a brief line (e.g. today\'s focus or one-line yesterday) and help them get oriented; if no log for today, ask for a **daily check-in** (see 7).',
+    '7. **No log for today** – If get_logs shows no log for today, ask the user for a **daily check-in** (sleep and mood). Do not ask for energy; derive it and call apply_log_update with mode create. Do **not** append a check-in question to every reply—only when there is no log for today or they ask to create today\'s log. When you call create, follow the **Daily check-in / create** rules below (use only what they said; no inventing).',
+    '8. **Single-field and tasks** – When the user mentions only one log thing (e.g. "I did a workout", "worked 5 hours"), use apply_log_update with mode single_field and that field + value. Same for tasks: when they ask to change a task\'s priority, due date, title, category, or notes, call **update_todo** with id_or_index (e.g. "1" for first open task) and only that field (e.g. priority: "High"). Do not only list tasks—call update_todo to apply the change.',
+    '9. **Energy budget** – The energy field is the **energy budget for that day** (1–10). Do **not** ask the user for it. It comes from **daily check-in**: derive from sleep (notes), mood, and optionally yesterday\'s overview (get_logs for yesterday). When updating energy later, use yesterday\'s overview as one input.',
+    '',
+    '## Daily check-in / create (no hallucination)',
+    'When calling apply_log_update with mode create (e.g. after step 7 above), use **only what the user said**. (1) **sleep_notes**: User\'s exact words or a short paraphrase; do not add details, times, or interpretations they did not say. (2) **energy**: Derive only from the sleep and mood they gave (e.g. good sleep + good mood → 6–8, poor sleep + low mood → 2–4); if you have no yesterday log, use only sleep + mood; do not invent context. (3) **title** (optional): Base only on sleep and mood they actually stated; do not add phrases they did not imply.',
     '',
     '## Responding',
     'Be friendly and conversational. Reply in full sentences, in your own words—as if you’re chatting, not filing a report. Match their tone and energy. After using tools, say something that fits the moment (e.g. a short acknowledgment, a follow-up question, or a light comment) instead of robotic confirmations or raw output. Only call tools when their intent is clear; when you change something (e.g. add a task, update the journal), mention it naturally in the flow of the reply.',
@@ -397,21 +426,43 @@ function buildSystemPrompt(
   return parts.join('\n');
 }
 
-/** Parse human-readable TOOL_CALLS: [{"name":"...","args":{...}}] or TOOL_CALLS: {"name":"...","args":{...}} */
+/** Parse human-readable TOOL_CALLS: [{"name":"...","args":{...}}] or TOOL_CALLS: {"name":"...","args":{...}}. Only when reply starts with TOOL_CALL(S): (same as RAW_TOOL_CALL_PATTERN). */
 function parseToolCalls(reply: string): ToolCall[] {
   const calls: ToolCall[] = [];
-  const prefix = /TOOL_CALLS?:\s*/i;
-  const idx = reply.search(prefix);
-  if (idx < 0) return calls;
-  const afterPrefix = reply.slice(idx + reply.match(prefix)![0].length);
+  const trimmed = reply.trim();
+  const prefix = /^TOOL_CALLS?:\s*/i;
+  const match = trimmed.match(prefix);
+  if (!match?.[0]) return calls;
+  const afterPrefix = trimmed.slice(match[0].length);
   const jsonStart = afterPrefix.search(/[\[{]/);
   if (jsonStart < 0) return calls;
   const open = afterPrefix[jsonStart] as '[' | '{';
   const close = open === '[' ? ']' : '}';
   let depth = 1;
   let end = jsonStart + 1;
+  let inString = false;
+  let escape = false;
+  let quoteChar = '';
   for (; end < afterPrefix.length && depth > 0; end++) {
     const c = afterPrefix[end];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (c === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if ((c === '"' || c === "'") && !inString) {
+      inString = true;
+      quoteChar = c;
+      continue;
+    }
+    if (c === quoteChar && inString) {
+      inString = false;
+      continue;
+    }
+    if (inString) continue;
     if (c === open) depth++;
     else if (c === close) depth--;
   }

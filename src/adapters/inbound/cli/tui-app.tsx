@@ -1,8 +1,17 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react';
 import { createCliRenderer, TextAttributes } from '@opentui/core';
-import { createRoot, useKeyboard, useRenderer } from '@opentui/react';
+import { createRoot, useKeyboard, useRenderer, useAppContext } from '@opentui/react';
 import { compose } from '../../../composition';
 import type { DailyLog } from '../../../domain/entities/DailyLog';
+import { getResolvedConfig, hasRequiredConfig } from '../../../config/resolved';
+import { loadProfile, saveProfile } from '../../../config/profile';
+import { loadSettings, saveSettings } from '../../../config/settings';
+import {
+  fetchDatabasePropertyNames,
+  getColumnPurpose,
+  suggestColumnMapping,
+  type ColumnMappingEntry,
+} from '../../../adapters/outbound/notion/client';
 
 /** Frame-based spinner for loading/thinking. */
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -11,7 +20,7 @@ const SPINNER_TICK_MS = 150;
 const TIPS = [
   'Type a message and press Enter to talk to the agent.',
   'Try "what are my open todos?" or "log today: shipped the feature".',
-  '? for shortcuts · Ctrl+C to exit',
+  '? for shortcuts · Ctrl+P: Profile & Settings · Ctrl+C to exit',
 ];
 
 const ROBOT = `
@@ -36,6 +45,36 @@ function normalizeError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   const firstLine = msg.split('\n')[0].trim();
   return firstLine.length > 120 ? firstLine.slice(0, 120) + '…' : firstLine;
+}
+
+/** Format today-log load error; add hint when it's a Notion property type or name mismatch. */
+function formatTodayLoadError(e: unknown): string {
+  const msg = normalizeError(e);
+  if (/could not find property|property with name or id/i.test(msg)) {
+    return msg + ' — For Status (Todo/In Progress/Done): add NOTION_TODOS_DONE_VALUE=Done in Profile & Settings or ~/.pa/settings.json. NOTION_TODOS_STATUS defaults to "Status".';
+  }
+  if (/property type in the database does not match.*filter provided/i.test(msg) && /select does not match filter checkbox/i.test(msg)) {
+    return msg + ' — Your TODOs "Done" column is a Status (select) in Notion. The app usually auto-detects this; if it failed, set NOTION_TODOS_DONE_VALUE and NOTION_TODOS_OPEN_VALUE in Profile & Settings or ~/.pa/settings.json (see .env.example).';
+  }
+  return msg;
+}
+
+function maskSecret(value: string | undefined): string {
+  if (!value || value.length === 0) return 'Not set';
+  if (value.length <= 8) return '***';
+  return value.slice(0, 4) + '…' + value.slice(-4);
+}
+
+/** Returns the character to append for keypress, or null if not a typeable character. */
+function typeableChar(key: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }): string | null {
+  if (key.ctrl || key.meta) return null;
+  if (key.name === 'space') return ' ';
+  if (key.name.length === 1) {
+    // Parser sends A–Z as lowercase name + shift; use uppercase when shift is set
+    if (key.shift && /^[a-z]$/.test(key.name)) return key.name.toUpperCase();
+    return key.name;
+  }
+  return null;
 }
 
 function useAgent() {
@@ -69,36 +108,220 @@ function useSpinner(active: boolean): string {
   return active ? SPINNER_FRAMES[frame] : SPINNER_FRAMES[0];
 }
 
-function App() {
+type Page = 'main' | 'settings';
+
+// Ask for the “brain” (OpenAI agent) first, then Notion data sources.
+const SETUP_STEPS: { key: keyof import('../../../config/settings').Settings; label: string }[] = [
+  { key: 'OPENAI_API_KEY', label: 'OpenAI API key (optional, for the journal agent)' },
+  { key: 'OPENAI_MODEL', label: 'OpenAI model (optional, e.g. gpt-4o-mini)' },
+  { key: 'NOTION_API_KEY', label: 'Notion API key (from notion.so/my-integrations)' },
+  { key: 'NOTION_LOGS_DATABASE_ID', label: 'Notion Logs database ID (from the database URL)' },
+  { key: 'NOTION_TODOS_DATABASE_ID', label: 'Notion TODOs database ID (from the database URL)' },
+];
+
+function FirstRunSetupContent({
+  setupStep,
+  setupInput,
+}: {
+  setupStep: number;
+  setupInput: string;
+}) {
+  const step = SETUP_STEPS[setupStep];
+  if (!step) return null;
+  const isSecret = step.key === 'NOTION_API_KEY' || step.key === 'OPENAI_API_KEY';
+  return (
+    <box style={{ flexDirection: 'column', padding: 1 }}>
+      <text style={{ attributes: TextAttributes.BOLD }}>First-run setup</text>
+      <text fg="#888888">Enter required settings. They will be saved to ~/.pa/settings.json</text>
+      <box style={{ marginTop: 1, flexDirection: 'column' }}>
+        <text style={{ attributes: TextAttributes.BOLD }}>
+          Step {setupStep + 1} of {SETUP_STEPS.length}: {step.label}
+        </text>
+        <box style={{ flexDirection: 'row', marginTop: 0 }}>
+          <text>{'> ' + (isSecret && setupInput.length > 0 ? '•'.repeat(Math.min(setupInput.length, 24)) : setupInput) + '▌'}</text>
+        </box>
+      </box>
+      <box style={{ marginTop: 1 }}>
+        <text fg="#888888">Press Enter to save and continue. Esc: skip (you can set later)</text>
+      </box>
+    </box>
+  );
+}
+
+type ColumnSuggestionRow = ColumnMappingEntry & { suggested: string };
+
+function ColumnScanningContent({ spinner }: { spinner: string }) {
+  return (
+    <box style={{ flexDirection: 'column', padding: 1 }}>
+      <text style={{ attributes: TextAttributes.BOLD }}>Connecting to Notion</text>
+      <text fg="#888888">Scanning databases and matching columns…</text>
+      <box style={{ marginTop: 1 }}>
+        <text fg="#00FFFF">{spinner}</text>
+        <text fg="#888888"> Please wait.</text>
+      </box>
+    </box>
+  );
+}
+
+function ColumnMappingContent({
+  row,
+  index,
+  total,
+  overrideInput,
+}: {
+  row: ColumnSuggestionRow;
+  index: number;
+  total: number;
+  overrideInput: string;
+}) {
+  const label = `${row.entity === 'logs' ? 'Logs' : 'TODOs'} '${row.ourKey}'`;
+  const purpose = getColumnPurpose(row.entity, row.ourKey);
+  return (
+    <box style={{ flexDirection: 'column', padding: 1 }}>
+      <text style={{ attributes: TextAttributes.BOLD }}>Confirm column mapping</text>
+      <text fg="#888888">Enter = accept suggested, or type a different property name.</text>
+      <box style={{ marginTop: 1, flexDirection: 'column' }}>
+        <text style={{ attributes: TextAttributes.BOLD }}>
+          Field {index + 1} of {total}: {label} → suggested: {row.suggested}
+        </text>
+        {purpose ? (
+          <box style={{ marginTop: 0 }}>
+            <text fg="#888888">Purpose: {purpose}</text>
+          </box>
+        ) : null}
+        <box style={{ flexDirection: 'row', marginTop: 0 }}>
+          <text>{'> ' + overrideInput + '▌'}</text>
+        </box>
+      </box>
+      <box style={{ marginTop: 1 }}>
+        <text fg="#888888">Press Enter to use suggested or your typed name. Esc: skip column setup.</text>
+      </box>
+    </box>
+  );
+}
+
+function SettingsPageContent({
+  displayNameInput,
+  setDisplayNameInput,
+  resolved,
+}: {
+  displayNameInput: string;
+  setDisplayNameInput: (s: string) => void;
+  resolved: ReturnType<typeof getResolvedConfig>;
+}) {
+  const s = resolved.settings;
+  return (
+    <box style={{ flexDirection: 'column', padding: 1 }}>
+      <text style={{ attributes: TextAttributes.BOLD }}>Profile & Settings</text>
+      <box style={{ marginTop: 1, flexDirection: 'column' }}>
+        <text style={{ attributes: TextAttributes.BOLD }}>Profile</text>
+        <text fg="#888888">Display name (Enter to save):</text>
+        <box style={{ flexDirection: 'row', marginTop: 0 }}>
+          <text>{'> ' + displayNameInput + '▌'}</text>
+        </box>
+        <text fg="#888888">Current: {resolved.profile.displayName}</text>
+      </box>
+      <box style={{ marginTop: 1, flexDirection: 'column' }}>
+        <text style={{ attributes: TextAttributes.BOLD }}>Settings</text>
+        <text fg="#888888">Notion API key: {maskSecret(s.NOTION_API_KEY)}</text>
+        <text fg="#888888">Logs DB ID: {s.NOTION_LOGS_DATABASE_ID || 'Not set'}</text>
+        <text fg="#888888">TODOs DB ID: {s.NOTION_TODOS_DATABASE_ID || 'Not set'}</text>
+        <text fg="#888888">OpenAI API key: {maskSecret(s.OPENAI_API_KEY)}</text>
+        <text fg="#888888">OpenAI model: {s.OPENAI_MODEL ?? 'gpt-4o-mini'}</text>
+      </box>
+      <box style={{ marginTop: 1 }}>
+        <text fg="#888888">Edit ~/.pa/settings.json or set env vars. Ctrl+P or Esc: Back to main</text>
+      </box>
+    </box>
+  );
+}
+
+function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
   const renderer = useRenderer();
+  const [page, setPage] = useState<Page>(() => (hasRequiredConfig() ? 'main' : 'settings'));
+  const [setupStep, setSetupStep] = useState<number | null>(() => (hasRequiredConfig() ? null : 0));
+  const [setupPhase, setSetupPhase] = useState<'scanning' | 'mapping' | null>(null);
+  const [columnSuggestions, setColumnSuggestions] = useState<ColumnSuggestionRow[] | null>(null);
+  const [mappingStep, setMappingStep] = useState(0);
+  const [mappingOverride, setMappingOverride] = useState('');
+  const [confirmedColumnValues, setConfirmedColumnValues] = useState<Record<number, string>>({});
+  const [columnScanError, setColumnScanError] = useState<string | null>(null);
+  const [setupInput, setSetupInput] = useState('');
+  const [settingsDisplayNameInput, setSettingsDisplayNameInput] = useState('');
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const [lastReply, setLastReply] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activityScroll, setActivityScroll] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
   const [history, setHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [todayLog, setTodayLog] = useState<DailyLog | null | 'loading'>('loading');
+  const [todayLogLoadError, setTodayLogLoadError] = useState<string | null>(null);
   const recentCountRef = useRef(0);
+  const resolved = getResolvedConfig();
   const { agent, logs, todos, logUseCase, error } = useAgent();
   recentCountRef.current = recent.length;
 
   const spinLoading = useSpinner(todayLog === 'loading');
   const spinThinking = useSpinner(thinking);
+  const spinScan = useSpinner(setupPhase === 'scanning');
 
   useEffect(() => {
-    if (error || !logs || !todos) {
-      if (!error) setTodayLog(null);
-      return;
-    }
-    const today = new Date().toISOString().slice(0, 10);
+    if (setupPhase !== 'scanning') return;
+    setColumnScanError(null);
     let cancelled = false;
     (async () => {
       try {
+        const s = loadSettings();
+        const apiKey = s.NOTION_API_KEY;
+        const logsId = s.NOTION_LOGS_DATABASE_ID;
+        const todosId = s.NOTION_TODOS_DATABASE_ID;
+        if (!apiKey || !logsId || !todosId) {
+          setColumnScanError('Missing Notion API key or database IDs');
+          setSetupPhase(null);
+          return;
+        }
+        const [logsProps, todosProps] = await Promise.all([
+          fetchDatabasePropertyNames(apiKey, logsId),
+          fetchDatabasePropertyNames(apiKey, todosId),
+        ]);
+        if (cancelled) return;
+        const suggestions = suggestColumnMapping(logsProps, todosProps);
+        setColumnSuggestions(suggestions);
+        setMappingStep(0);
+        setMappingOverride('');
+        setConfirmedColumnValues({});
+        setSetupPhase('mapping');
+      } catch (e) {
+        if (!cancelled) {
+          setColumnScanError(e instanceof Error ? e.message : String(e));
+          setSetupPhase(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setupPhase]);
+
+  useEffect(() => {
+    if (error || !logs || !todos) return;
+    const today = new Date().toISOString().slice(0, 10);
+    let cancelled = false;
+    setTodayLogLoadError(null);
+    (async () => {
+      try {
         const [log] = await Promise.all([logs.findByDate(today), todos.listOpen()]);
-        if (!cancelled) setTodayLog(log ?? null);
-      } catch {
-        if (!cancelled) setTodayLog(null);
+        if (!cancelled) {
+          setTodayLog(log ?? null);
+          setTodayLogLoadError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setTodayLogLoadError(formatTodayLoadError(e));
+          setTodayLog(null);
+        }
       }
     })();
     return () => {
@@ -106,7 +329,7 @@ function App() {
     };
   }, [error, logs, todos]);
 
-  const userName = process.env.USER || process.env.USERNAME || 'there';
+  const userName = resolved.profile.displayName;
 
   useEffect(() => {
     if (!errorMessage) return;
@@ -135,6 +358,17 @@ function App() {
       setHistory((h) => [...h, { role: 'user', content: line }, { role: 'assistant', content: reply }]);
       setLastReply(reply);
       setRecent((r) => ['Agent: ' + (reply.length > 60 ? reply.slice(0, 60) + '…' : reply), ...r].slice(0, 8));
+      // Refetch today's log in case the agent created or updated it
+      if (logs) {
+        const today = new Date().toISOString().slice(0, 10);
+        try {
+          const log = await logs.findByDate(today);
+          setTodayLog(log ?? null);
+          setTodayLogLoadError(null);
+        } catch (e) {
+          setTodayLogLoadError(formatTodayLoadError(e));
+        }
+      }
     } catch (e) {
       const msg = normalizeError(e);
       setErrorMessage(msg);
@@ -142,9 +376,125 @@ function App() {
     } finally {
       setThinking(false);
     }
-  }, [input, agent, history, renderer]);
+  }, [input, agent, history, logs, renderer]);
 
   useKeyboard((key) => {
+    const openSettings = () => setPage('settings');
+    const goMain = () => setPage('main');
+    if (showHelp) {
+      setShowHelp(false);
+      return;
+    }
+    if (page === 'main' && key.name === '?') {
+      setShowHelp(true);
+      return;
+    }
+    if (key.ctrl && key.name === 'p') {
+      if (page === 'main') openSettings();
+      else goMain();
+      return;
+    }
+    if (key.name === 'escape') {
+      if (page === 'settings') goMain();
+      return;
+    }
+    if (page === 'settings') {
+      if (columnScanError && key.name === 'escape') {
+        setColumnScanError(null);
+        onConfigSaved?.();
+        return;
+      }
+      if (setupPhase === 'mapping' && columnSuggestions && columnSuggestions.length > 0) {
+        const row = columnSuggestions[mappingStep];
+        if (key.name === 'return') {
+          const value = (mappingOverride.trim() || row?.suggested) ?? '';
+          setConfirmedColumnValues((prev) => ({ ...prev, [mappingStep]: value }));
+          setMappingOverride('');
+          if (mappingStep >= columnSuggestions.length - 1) {
+            const current = loadSettings();
+            columnSuggestions.forEach((r, i) => {
+              const v = i === mappingStep ? value : (confirmedColumnValues[i] ?? r.suggested) || r.suggested;
+              (current as Record<string, string>)[r.settingsKey] = v;
+            });
+            saveSettings(current);
+            setSetupPhase(null);
+            setColumnSuggestions(null);
+            setConfirmedColumnValues({});
+            onConfigSaved?.();
+          } else {
+            setMappingStep((s) => s + 1);
+          }
+          return;
+        }
+        if (key.name === 'escape') {
+          setSetupPhase(null);
+          setColumnSuggestions(null);
+          onConfigSaved?.();
+          return;
+        }
+        if (key.name === 'backspace' || key.name === 'delete') {
+          setMappingOverride((s) => s.slice(0, -1));
+          return;
+        }
+        const cMap = typeableChar(key);
+        if (cMap !== null) {
+          setMappingOverride((s) => s + cMap);
+          return;
+        }
+        return;
+      }
+      if (setupStep !== null) {
+        if (key.name === 'return') {
+          const step = SETUP_STEPS[setupStep];
+          if (step) {
+            const value = setupInput.trim();
+            const current = loadSettings();
+            (current as Record<string, string>)[step.key] = value;
+            saveSettings(current);
+            setSetupInput('');
+            if (setupStep >= SETUP_STEPS.length - 1) {
+              setSetupStep(null);
+              setSetupPhase('scanning');
+            } else {
+              setSetupStep(setupStep + 1);
+            }
+          }
+          return;
+        }
+        if (key.name === 'backspace' || key.name === 'delete') {
+          setSetupInput((s) => s.slice(0, -1));
+          return;
+        }
+        const c = typeableChar(key);
+        if (c !== null) {
+          setSetupInput((s) => s + c);
+          return;
+        }
+        if (key.name === 'escape') {
+          setSetupStep(null);
+          return;
+        }
+        return;
+      }
+      if (key.name === 'return') {
+        const name = settingsDisplayNameInput.trim();
+        if (name.length > 0) {
+          saveProfile({ displayName: name });
+          setSettingsDisplayNameInput('');
+        }
+        return;
+      }
+      if (key.name === 'backspace' || key.name === 'delete') {
+        setSettingsDisplayNameInput((s) => s.slice(0, -1));
+        return;
+      }
+      const c2 = typeableChar(key);
+      if (c2 !== null) {
+        setSettingsDisplayNameInput((s) => s + c2);
+        return;
+      }
+      return;
+    }
     if (key.name === 'return') {
       submit();
       return;
@@ -171,10 +521,78 @@ function App() {
       });
       return;
     }
-    if (key.name.length === 1 && !key.ctrl && !key.meta) {
-      setInput((s) => s + key.name);
+    const c3 = typeableChar(key);
+    if (c3 !== null) {
+      setInput((s) => s + c3);
     }
   });
+
+  const { keyHandler } = useAppContext();
+  const inputStateRef = useRef({ page, setupStep, setupPhase });
+  useLayoutEffect(() => {
+    inputStateRef.current = { page, setupStep, setupPhase };
+  });
+  useEffect(() => {
+    if (!keyHandler) return;
+    const onPaste = (event: { text: string }) => {
+      const text = (event.text ?? '').replace(/\r?\n/g, ' ').trimEnd();
+      if (!text) return;
+      const { page: p, setupStep: step, setupPhase: phase } = inputStateRef.current;
+      if (p === 'settings') {
+        if (phase === 'mapping') setMappingOverride((s) => s + text);
+        else if (step !== null) setSetupInput((s) => s + text);
+        else setSettingsDisplayNameInput((s) => s + text);
+      } else {
+        setInput((s) => s + text);
+      }
+    };
+    keyHandler.on('paste', onPaste);
+    return () => {
+      keyHandler.off('paste', onPaste);
+    };
+  }, [keyHandler]);
+
+  if (page === 'settings') {
+    if (setupPhase === 'scanning') {
+      return <ColumnScanningContent spinner={spinScan} />;
+    }
+    if (setupPhase === 'mapping' && columnSuggestions && columnSuggestions.length > 0) {
+      const row = columnSuggestions[mappingStep];
+      if (row) {
+        return (
+          <ColumnMappingContent
+            row={row}
+            index={mappingStep}
+            total={columnSuggestions.length}
+            overrideInput={mappingOverride}
+          />
+        );
+      }
+    }
+    if (columnScanError) {
+      return (
+        <box style={{ flexDirection: 'column', padding: 1 }}>
+          <text style={{ attributes: TextAttributes.BOLD }} fg="#FF0000">Column scan failed</text>
+          <text fg="#FF0000">{columnScanError}</text>
+          <box style={{ marginTop: 1 }}>
+            <text fg="#888888">Esc: skip column setup and continue. You can edit ~/.pa/settings.json later.</text>
+          </box>
+        </box>
+      );
+    }
+    if (setupStep !== null) {
+      return (
+        <FirstRunSetupContent setupStep={setupStep} setupInput={setupInput} />
+      );
+    }
+    return (
+      <SettingsPageContent
+        displayNameInput={settingsDisplayNameInput}
+        setDisplayNameInput={setSettingsDisplayNameInput}
+        resolved={resolved}
+      />
+    );
+  }
 
   if (error) {
     return (
@@ -182,7 +600,7 @@ function App() {
         <text fg="#FF0000" style={{ attributes: TextAttributes.BOLD }}>Could not start</text>
         <text fg="#FF0000">{error}</text>
         <box style={{ marginTop: 1 }}>
-          <text fg="#888888">Set NOTION_API_KEY, NOTION_LOGS_DATABASE_ID, NOTION_TODOS_DATABASE_ID in .env (see .env.example).</text>
+          <text fg="#888888">Press Ctrl+P to open Profile & Settings, or set in .env / ~/.pa/settings.json</text>
         </box>
         <box style={{ marginTop: 1 }}>
           <text fg="#888888">{FAKE_ENV_HINT}</text>
@@ -234,12 +652,15 @@ function App() {
                 <text fg="#888888"> Loading…</text>
               </>
             )}
-            {todayLog && todayLog !== 'loading' && (
+            {todayLogLoadError && (
+              <text fg="#FF0000">{'\nError loading: ' + todayLogLoadError}</text>
+            )}
+            {todayLog && todayLog !== 'loading' && !todayLogLoadError && (
               <text fg="#888888">
                 {'\n' + (todayLog.content.title || 'Untitled') + (todayLog.content.notes ? ` — ${todayLog.content.notes.slice(0, 50)}${todayLog.content.notes.length > 50 ? '…' : ''}` : '')}
               </text>
             )}
-            {!todayLog && (
+            {!todayLog && !todayLogLoadError && (
               <text fg="#888888">{"\nNo log for today yet.\nHow did you sleep? How's your mood after waking up?"}</text>
             )}
           </box>
@@ -274,9 +695,20 @@ function App() {
         <text fg="#888888">? for shortcuts</text>
         {thinking ? <text fg="#FFFF00">{spinThinking} Thinking…</text> : <text fg="#888888">Ready</text>}
       </box>
+      {showHelp && (
+        <box style={{ marginTop: 1, borderStyle: 'single', padding: 1, flexDirection: 'column' }}>
+          <text style={{ attributes: TextAttributes.BOLD }}>Shortcuts</text>
+          <text fg="#888888">{'\n? - this help\nCtrl+P - Profile & Settings\nCtrl+C - exit\n↑ / ↓ - scroll recent activity\n\nPress any key to close'}</text>
+        </box>
+      )}
     </box>
   );
 }
 
+function AppRoot() {
+  const [configVersion, setConfigVersion] = useState(0);
+  return <App key={configVersion} onConfigSaved={() => setConfigVersion((v) => v + 1)} />;
+}
+
 const renderer = await createCliRenderer({ exitOnCtrlC: true });
-createRoot(renderer).render(<App />);
+createRoot(renderer).render(<AppRoot />);

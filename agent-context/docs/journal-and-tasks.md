@@ -13,6 +13,8 @@
 
 ## Log fields (all meaningful)
 
+Field names and purposes here match the app's column mapping (see `notion-schema` in code); user and AI use the same semantics.
+
 | Field          | Purpose |
 |----------------|--------|
 | date           | Log date (YYYY-MM-DD) |
@@ -45,7 +47,9 @@ When opening the app (TUI or today view), load only that specific date's log (to
 
 ## No log for today
 
-If there is no log entry for today, ask only for **sleep** (how they slept) and **mood after they woke up**. Do not ask for energy budget; derive it from daily check-in (sleep, mood, yesterday's overview). Then create the log (Mode 0) with sleep, mood, and derived energy. Keep it brief.
+If there is no log entry for today, ask the user for a **daily check-in** (sleep and mood). Do not ask for energy; derive it and create the log (Mode 0). Do not append a check-in question to every reply—only when there is no log for today or they ask to create or open today's log.
+
+**Do not hallucinate on create.** Use only what the user said: (1) **sleep_notes** = their exact words or a short paraphrase; do not add times, details, or interpretations they did not say. (2) **energy** = derive only from the sleep and mood they gave (e.g. good sleep + good mood → 6–8); if you did not fetch yesterday's log, use only sleep + mood. (3) **title** = base only on sleep and mood they stated; do not add phrases they did not imply.
 
 ---
 
@@ -58,7 +62,9 @@ If there is no log entry for today, ask only for **sleep** (how they slept) and 
 
 ## Summary (end of day or user asks)
 
-Follow **Mode 2** in `rules/data.md`: call `apply_log_update` with `mode: "summarize"` and **all** of: date, score, title, went_well, improve, gratitude, tomorrow, energy (and notes if useful). Then in your reply: short overall line + done & undone tasks (from `list_todos` with `include_done: true`). The log must already exist (create first if not).
+**Before summarizing:** Select all tasks for that specific day to analyze: call `list_todos` with `include_done: true` and `for_date: <that date>` (YYYY-MM-DD) to get all undone and done tasks due that day. Use that list to inform went_well, improve, tomorrow, and your reply.
+
+Then follow **Mode 2** in `rules/data.md`: call `apply_log_update` with `mode: "summarize"` and **all** of: date, score, title, went_well, improve, gratitude, tomorrow, energy (and notes if useful). In your reply: short overall line + done & undone tasks for that day (from the list_todos result). The log must already exist (create first if not).
 
 ---
 

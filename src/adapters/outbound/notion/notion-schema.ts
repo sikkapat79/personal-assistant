@@ -10,7 +10,7 @@
  * | Due Date   | Date       | When the task is due                          |
  * | Notes      | Text       | Free-form notes                               |
  * | Priority   | Select     | High | Medium | Low                  |
- * | Done       | Checkbox   | Completion flag                               |
+ * | Done       | Checkbox or Status (select) | Completion flag; Status is auto-detected if used |
  *
  * --- Logs ---
  * | Column         | Notion type | Purpose                                      |
@@ -58,3 +58,21 @@ export const NOTION_SCHEMA_PURPOSE = {
     tomorrow: '[C] TODOs for next day from energy/priority/due',
   },
 } as const;
+
+type LogsPurposeKey = keyof (typeof NOTION_SCHEMA_PURPOSE)['logs'];
+type TodosPurposeKey = keyof (typeof NOTION_SCHEMA_PURPOSE)['todos'];
+
+/** Type-safe lookup for column purpose by entity and ourKey. Used by TUI setup and can guide agent/docs. */
+export function getColumnPurpose(
+  entity: 'logs' | 'todos',
+  ourKey: string
+): string {
+  const map = NOTION_SCHEMA_PURPOSE[entity];
+  if (entity === 'logs' && ourKey in NOTION_SCHEMA_PURPOSE.logs) {
+    return NOTION_SCHEMA_PURPOSE.logs[ourKey as LogsPurposeKey];
+  }
+  if (entity === 'todos' && ourKey in NOTION_SCHEMA_PURPOSE.todos) {
+    return NOTION_SCHEMA_PURPOSE.todos[ourKey as TodosPurposeKey];
+  }
+  return '';
+}

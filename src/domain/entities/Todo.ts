@@ -7,7 +7,11 @@ import { createTodoDueDate } from '../value-objects/TodoDueDate';
 export type TodoStatus = 'open' | 'done';
 
 export type TodoCategory = 'Work' | 'Health' | 'Personal' | 'Learning';
+
+/** Canonical priority values (Notion select). Inputs are normalized case-insensitively when parsing. */
 export type TodoPriority = 'High' | 'Medium' | 'Low';
+
+export const TODO_PRIORITIES: readonly TodoPriority[] = ['High', 'Medium', 'Low'];
 
 /** Aggregate root: single task (identity = TodoId). */
 export interface Todo {

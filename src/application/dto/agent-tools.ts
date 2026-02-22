@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '../ports/ILLMPort';
+import { TODO_PRIORITIES } from '../../domain/entities/Todo';
 
 export const AGENT_TOOLS: ToolDefinition[] = [
   {
@@ -14,7 +15,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'apply_log_update',
     description:
-      'Create or update the daily log for a date. Use this for all log writes. Three modes: (1) create: when no log exists; requires sleep_notes (or notes), mood, energy. Ask user only for sleep and mood; derive energy from daily check-in (sleep, mood, yesterday\'s overview via get_logs)—do not ask user for energy. Optional title. (2) single_field: when log exists and user mentioned one thing; requires field and value. (3) summarize: when log exists and user asks for end-of-day summary; requires score, title, went_well, improve, gratitude, tomorrow, energy. If no log exists, single_field and summarize return an error: create first with mode create.',
+      'Create or update the daily log for a date. Use this for all log writes. Three modes: (1) create: when no log exists; requires sleep_notes (or notes), mood, energy. Ask user only for sleep and mood; derive energy from daily check-in (sleep, mood, yesterday\'s overview via get_logs)—do not ask user for energy. For create: use the user\'s exact words for sleep_notes; do not invent or elaborate. Derive energy only from stated sleep and mood (simple mapping); do not fabricate. Optional title: base only on what they said. (2) single_field: when log exists and user mentioned one thing; requires field and value. (3) summarize: when log exists and user asks for end-of-day summary; requires score, title, went_well, improve, gratitude, tomorrow, energy. If no log exists, single_field and summarize return an error: create first with mode create.',
     parameters: {
       type: 'object',
       properties: {
@@ -63,10 +64,14 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'list_todos',
-    description: 'List tasks (open only, or all if include_done is true).',
+    description:
+      'List tasks (open only, or all if include_done is true). When summarizing a day, pass for_date (YYYY-MM-DD) with include_done: true to get only tasks due that day (done and undone) so you can analyze them before summarizing.',
     parameters: {
       type: 'object',
-      properties: { include_done: { type: 'boolean' } },
+      properties: {
+        include_done: { type: 'boolean' },
+        for_date: { type: 'string', description: 'Optional. When set, return only tasks due on this date (YYYY-MM-DD). Use when summarizing to load that day\'s tasks.' },
+      },
     },
   },
   {
@@ -80,7 +85,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
         category: { type: 'string', enum: ['Work', 'Health', 'Personal', 'Learning'] },
         due_date: { type: 'string' },
         notes: { type: 'string' },
-        priority: { type: 'string', enum: ['High', 'Medium', 'Low'] },
+        priority: { type: 'string', enum: [...TODO_PRIORITIES] },
       },
       required: ['title', 'category'],
     },
@@ -101,7 +106,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
               category: { type: 'string', enum: ['Work', 'Health', 'Personal', 'Learning'] },
               due_date: { type: 'string' },
               notes: { type: 'string' },
-              priority: { type: 'string', enum: ['High', 'Medium', 'Low'] },
+              priority: { type: 'string', enum: [...TODO_PRIORITIES] },
             },
             required: ['title', 'category'],
           },
@@ -113,7 +118,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'update_todo',
     description:
-      'Update an existing task by id or 1-based index. Only include fields to change. Params: id_or_index, title (optional), category (optional: Work, Health, Personal, Learning), due_date (optional, YYYY-MM-DD or empty to clear), notes (optional), priority (optional).',
+      'Update an existing task by id or 1-based index. Call this when the user asks to change a task\'s priority, due date, title, category, or notes (e.g. "set task 1 to high priority", "change priority of the first todo to Medium"). Only include the field(s) to change. Params: id_or_index (required; use 1-based index from list_todos, e.g. "1" for first task), title (optional), category (optional), due_date (optional, YYYY-MM-DD or empty to clear), notes (optional), priority (optional: High, Medium, Low).',
     parameters: {
       type: 'object',
       properties: {
@@ -122,7 +127,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
         category: { type: 'string', enum: ['Work', 'Health', 'Personal', 'Learning'] },
         due_date: { type: 'string' },
         notes: { type: 'string' },
-        priority: { type: 'string', enum: ['High', 'Medium', 'Low'] },
+        priority: { type: 'string', enum: [...TODO_PRIORITIES] },
       },
       required: ['id_or_index'],
     },

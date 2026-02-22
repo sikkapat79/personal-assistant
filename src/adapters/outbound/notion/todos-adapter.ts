@@ -8,10 +8,13 @@ import type { TodoCategory, TodoPriority } from '../../../domain/entities/Todo';
 import type { TodosColumns, TodosDoneKind } from './client';
 import { createTodo } from '../../../domain/entities/Todo';
 import { createTodoId } from '../../../domain/value-objects/TodoId';
-import { getNotionClient } from './client';
+import { getNotionClient, fetchTodosDoneOptions } from './client';
 
 /** Notion adapter for TODOs: uses database_id and full column mapping from config. Supports Done as checkbox or Status (select). */
 export class NotionTodosAdapter implements ITodosRepository {
+  /** When DB has Status type but config said checkbox, we infer and cache so add/complete/listOpen use status. */
+  private resolvedDoneKind: TodosDoneKind | null = null;
+
   constructor(
     private readonly client: ReturnType<typeof getNotionClient>,
     private readonly databaseId: string,
@@ -19,18 +22,43 @@ export class NotionTodosAdapter implements ITodosRepository {
     private readonly doneKind: TodosDoneKind
   ) {}
 
+  private getDoneKind(): TodosDoneKind {
+    return this.resolvedDoneKind ?? this.doneKind;
+  }
+
   async listOpen(): Promise<Todo[]> {
     const c = this.columns;
+    const kind = this.getDoneKind();
     const filter =
-      this.doneKind.type === 'checkbox'
+      kind.type === 'checkbox'
         ? { property: c.done, checkbox: { equals: false } }
-        : { property: c.done, select: { does_not_equal: this.doneKind.doneValue } };
-    const res = await this.client.databases.query({
-      database_id: this.databaseId,
-      filter,
-      sorts: [{ property: c.dueDate, direction: 'ascending' }],
-    });
-    return res.results.map((p) => pageToTodo(p, c, this.doneKind)).filter(Boolean) as Todo[];
+        : { property: c.done, select: { does_not_equal: kind.doneValue } };
+    let res;
+    try {
+      res = await this.client.databases.query({
+        database_id: this.databaseId,
+        filter,
+        sorts: [{ property: c.dueDate, direction: 'ascending' }],
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/select does not match filter checkbox/i.test(msg)) {
+        const inferred = await fetchTodosDoneOptions(this.client, this.databaseId, c.done);
+        if (inferred) {
+          const statusFilter = { property: c.done, select: { does_not_equal: inferred.doneValue } };
+          const retryRes = await this.client.databases.query({
+            database_id: this.databaseId,
+            filter: statusFilter,
+            sorts: [{ property: c.dueDate, direction: 'ascending' }],
+          });
+          const statusKind: TodosDoneKind = { type: 'status', doneValue: inferred.doneValue, openValue: inferred.openValue };
+          this.resolvedDoneKind = statusKind;
+          return retryRes.results.map((p) => pageToTodo(p, c, statusKind)).filter(Boolean) as Todo[];
+        }
+      }
+      throw err;
+    }
+    return res.results.map((p) => pageToTodo(p, c, kind)).filter(Boolean) as Todo[];
   }
 
   async listAll(): Promise<Todo[]> {
@@ -39,15 +67,16 @@ export class NotionTodosAdapter implements ITodosRepository {
       database_id: this.databaseId,
       sorts: [{ property: c.dueDate, direction: 'ascending' }],
     });
-    return res.results.map((p) => pageToTodo(p, c, this.doneKind)).filter(Boolean) as Todo[];
+    return res.results.map((p) => pageToTodo(p, c, this.getDoneKind())).filter(Boolean) as Todo[];
   }
 
   async add(todo: Todo): Promise<Todo> {
     const c = this.columns;
+    const kind = this.getDoneKind();
     const doneProp =
-      this.doneKind.type === 'checkbox'
+      kind.type === 'checkbox'
         ? { checkbox: false }
-        : { select: { name: this.doneKind.openValue } };
+        : { select: { name: kind.openValue } };
     const props: Record<string, unknown> = {
       [c.title]: { title: [{ text: { content: todo.title } }] },
       [c.done]: doneProp,
@@ -71,10 +100,11 @@ export class NotionTodosAdapter implements ITodosRepository {
 
   async complete(id: TodoId): Promise<void> {
     const c = this.columns;
+    const kind = this.getDoneKind();
     const doneProp =
-      this.doneKind.type === 'checkbox'
+      kind.type === 'checkbox'
         ? { checkbox: true }
-        : { select: { name: this.doneKind.doneValue } };
+        : { select: { name: kind.doneValue } };
     await this.client.pages.update({
       page_id: id,
       properties: { [c.done]: doneProp },

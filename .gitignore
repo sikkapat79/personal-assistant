@@ -10,6 +10,7 @@ build/
 .env
 .env.local
 .env.*.local
+env.test
 *.pem
 
 # Logs and temp
