@@ -1,5 +1,5 @@
-import type { ILogsRepository } from './application/ports/ILogsRepository';
-import type { ITodosRepository } from './application/ports/ITodosRepository';
+import type { ILogsRepository } from './application/ports/logs-repository';
+import type { ITodosRepository } from './application/ports/todos-repository';
 import { getNotionClient, buildNotionConfigFromResolved } from './adapters/outbound/notion/client';
 import { NotionLogsAdapter } from './adapters/outbound/notion/logs-adapter';
 import { NotionTodosAdapter } from './adapters/outbound/notion/todos-adapter';

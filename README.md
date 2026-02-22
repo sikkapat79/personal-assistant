@@ -1,4 +1,4 @@
-# pa – Self-discipline daily journal
+# Pax – Self-discipline daily journal
 
 CLI and optional **Pax** agent for daily logs and TODOs in Notion.
 
@@ -57,7 +57,7 @@ The project runs with **Bun** (TypeScript executed directly, no `tsc` build). Im
 
 To run the journal daily (e.g. morning reminder):
 
-- **cron:** `0 8 * * * cd /path/to/pa && bun run daily`
+- **cron:** `0 8 * * * cd /path/to/Pax && bun run daily`
 - **macOS launchd:** create a plist that runs `bun run daily` at a set time.
 
 The `daily` script runs `journal today`. Optionally use `node-notifier` or `osascript` in `scripts/daily-reminder.sh` to show a system notification.
@@ -67,6 +67,15 @@ The `daily` script runs `journal today`. Optionally use `node-notifier` or `osas
 - **domain/** – entities (DailyLog, Todo), value objects. No I/O.
 - **application/ports/** – ILogsRepository, ITodosRepository, etc.
 - **application/use-cases/** – log, todos, agent (orchestration only).
-- **adapters/inbound/cli/** – CLI entry, interactive prompt, and TUI (tui-app.tsx).
+- **adapters/inbound/cli/** – CLI entry (`index.ts`), interactive prompt, and TUI. TUI is split into a thin entry and a module:
+  - **tui-app.tsx** – entry only: create CLI renderer, mount `<AppRoot />`.
+  - **tui/** – TUI module (one function/component per file): `App.tsx`, `AppRoot.tsx`, hooks (`useAgent`, `useSpinner`, `usePaxAnimationFrame`), small components (`FirstRunSetupContent`, `ColumnScanningContent`, `ColumnMappingContent`, `SettingsPageContent`), utils (`energyBarSegments`, `getPaxMood`, `clearConsole`, `normalizeError`, `formatTodayLoadError`, `maskSecret`, `typeableChar`), **tui/constants/** (spinner, tips, pax, setup, layout), **tui/types.ts**.
 - **adapters/outbound/notion/** – Notion API adapters.
 - **agent-context/** – editable docs, rules, and skills for the agent (data rules, journal/task reference). Loaded each run; edit to change agent behaviour without code changes.
+
+## License and community
+
+- **License:** [MIT](LICENSE).
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) – setup, conventions, how to send a PR.
+- **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- **Security:** [SECURITY.md](SECURITY.md) – how to report vulnerabilities.

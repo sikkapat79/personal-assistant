@@ -1,5 +1,5 @@
-import type { DailyLog } from '../../domain/entities/DailyLog';
-import type { LogDate } from '../../domain/value-objects/LogDate';
+import type { DailyLog } from '../../domain/entities/daily-log';
+import type { LogDate } from '../../domain/value-objects/log-date';
 
 export interface ILogsRepository {
   findByDate(date: LogDate): Promise<DailyLog | null>;

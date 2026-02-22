@@ -1,7 +1,7 @@
 import prompts from 'prompts';
 import { compose } from '../../../composition';
 import { AGENT_NAME } from '../../../config/branding';
-import { todayLogDate } from '../../../domain/value-objects/LogDate';
+import { todayLogDate } from '../../../domain/value-objects/log-date';
 import { createSpinner, say, sayDone, sayError } from './ui';
 
 type Choice = 'log' | 'todos-list' | 'todos-add' | 'today' | 'agent' | 'exit';

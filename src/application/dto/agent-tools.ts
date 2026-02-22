@@ -1,5 +1,5 @@
-import type { ToolDefinition } from '../ports/ILLMPort';
-import { TODO_PRIORITIES } from '../../domain/entities/Todo';
+import type { ToolDefinition } from '../ports/llm-port';
+import { TODO_PRIORITIES } from '../../domain/entities/todo';
 
 export const AGENT_TOOLS: ToolDefinition[] = [
   {

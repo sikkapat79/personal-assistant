@@ -1,8 +1,8 @@
-import type { ILogsRepository } from '../ports/ILogsRepository';
-import type { LogContent } from '../../domain/value-objects/LogContent';
-import { createLogDate } from '../../domain/value-objects/LogDate';
-import { createLogContent } from '../../domain/value-objects/LogContent';
-import { createDailyLog, updateContent } from '../../domain/entities/DailyLog';
+import type { ILogsRepository } from '../ports/logs-repository';
+import type { LogContent } from '../../domain/value-objects/log-content';
+import { createLogDate } from '../../domain/value-objects/log-date';
+import { createLogContent } from '../../domain/value-objects/log-content';
+import { createDailyLog, updateContent } from '../../domain/entities/daily-log';
 import type { LogInputDto, LogResultDto } from '../dto/log-dto';
 
 function mergeLogContent(existing: LogContent | undefined, input: LogInputDto): LogContent {

@@ -1,4 +1,4 @@
-import type { TodoCategory, TodoPriority, TodoStatus } from '../../domain/entities/Todo';
+import type { TodoCategory, TodoPriority, TodoStatus } from '../../domain/entities/todo';
 
 export interface TodoItemDto {
   id: string;

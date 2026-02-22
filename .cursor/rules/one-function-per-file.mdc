@@ -1,0 +1,25 @@
+---
+description: One function, one class, or one component per file; prefer small modules and thin entry points
+globs: "**/*.ts,**/*.tsx"
+alwaysApply: true
+---
+
+# One function or one class per file (project convention)
+
+This codebase is refactored so that **one exported function, class, or component lives in one file**. Use the same approach when adding or refactoring code.
+
+## Rules
+
+- **One main export per file**: Each `.ts` / `.tsx` file should export a single function, class, component, or small constant module (e.g. one type + one const object). Helpers used only in that file may stay in the same file.
+- **Thin entry points**: Entry scripts (e.g. CLI, TUI) only bootstrap and delegate: create renderer/runner, then import and call the main component or runner from a dedicated module. Keep entry files under ~10 lines.
+- **Colocate by feature**: Group related files in a folder (e.g. `tui/`, `tui/constants/`) rather than one giant file. Constants can live in small modules (e.g. `constants/spinner.ts`, `constants/pax.ts`).
+- **Imports**: From a subfolder (e.g. `src/adapters/inbound/cli/tui/`), use `../../../../` (or the correct number of levels) to reach `src/` (composition, config, domain, design-tokens, adapters). From `tui/constants/` use one more level up to reach `src/`.
+
+## Example (TUI)
+
+- Entry: `tui-app.tsx` only creates renderer and renders `<AppRoot />`.
+- `tui/App.tsx` composes state and UI; `tui/AppRoot.tsx` wraps App with config version.
+- One file each: `energyBarSegments.ts`, `getPaxMood.ts`, `useSpinner.ts`, `FirstRunSetupContent.tsx`, etc.
+- Constants in `tui/constants/`: `spinner.ts`, `tips.ts`, `pax.ts`, `setup.ts`, `layout.ts`.
+
+When refactoring other areas (e.g. use-cases, adapters), apply the same pattern: extract one function, class, or component per file and keep entry points thin.
