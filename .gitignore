@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs and temp
+logs/
+*.log
+npm-debug.log*
+tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test and coverage
+coverage/
+.nyc_output/
+
+# Optional local config (e.g. local notion/test overrides)
+*.local.*

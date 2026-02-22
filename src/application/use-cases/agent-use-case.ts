@@ -1,0 +1,432 @@
+import type { ILogsRepository } from '../ports/ILogsRepository';
+import type { ITodosRepository } from '../ports/ITodosRepository';
+import type { IAgentContextPort } from '../ports/IAgentContextPort';
+import type { ILLMPort, ChatMessage } from '../ports/ILLMPort';
+import type { TodoPriority, TodoCategory } from '../../domain/entities/Todo';
+import type { LogInputDto } from '../dto/log-dto';
+import { AGENT_TOOLS } from '../dto/agent-tools';
+import { LogUseCase } from './log-use-case';
+import { TodosUseCase } from './todos-use-case';
+
+const VALID_PRIORITIES: TodoPriority[] = ['High', 'Medium', 'Low'];
+const VALID_CATEGORIES: TodoCategory[] = ['Work', 'Health', 'Personal', 'Learning'];
+const DEFAULT_CATEGORY: TodoCategory = 'Personal';
+
+function parsePriority(value: unknown): TodoPriority | undefined {
+  if (typeof value !== 'string') return undefined;
+  const p = value as TodoPriority;
+  return VALID_PRIORITIES.includes(p) ? p : undefined;
+}
+
+function parseCategory(value: unknown): TodoCategory {
+  if (typeof value !== 'string') return DEFAULT_CATEGORY;
+  const c = value as TodoCategory;
+  return VALID_CATEGORIES.includes(c) ? c : DEFAULT_CATEGORY;
+}
+
+export interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+/** Map single_field (field name + value) to one key of LogInputDto for merge. */
+function parseSingleFieldValue(
+  field: string,
+  rawValue: unknown
+): Partial<Omit<LogInputDto, 'date'>> | undefined {
+  const v = rawValue;
+  const str = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  const num = typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+  const bool =
+    v === true || v === false ? v : str === 'true' ? true : str === 'false' ? false : undefined;
+  switch (field) {
+    case 'workout':
+      return bool !== undefined ? { workout: bool } : undefined;
+    case 'diet':
+      return bool !== undefined ? { diet: bool } : undefined;
+    case 'mood':
+      return !Number.isNaN(num) && num >= 1 && num <= 5 ? { mood: Math.round(num) } : undefined;
+    case 'energy':
+      return !Number.isNaN(num) && num >= 1 && num <= 10 ? { energy: Math.round(num) } : undefined;
+    case 'score':
+      return !Number.isNaN(num) && num >= 1 && num <= 10 ? { score: Math.round(num) } : undefined;
+    case 'deep_work_hours':
+      return !Number.isNaN(num) && num >= 0 ? { deepWorkHours: num } : undefined;
+    case 'reading_mins':
+      return !Number.isNaN(num) && num >= 0 ? { readingMins: Math.round(num) } : undefined;
+    case 'title':
+      return typeof v === 'string' && v.trim() !== '' ? { title: v.trim() } : undefined;
+    case 'notes':
+      return v !== undefined && v !== null ? { notes: String(v).trim() || undefined } : undefined;
+    default:
+      return undefined;
+  }
+}
+
+export class AgentUseCase {
+  constructor(
+    private readonly logs: ILogsRepository,
+    private readonly todos: ITodosRepository,
+    private readonly context: IAgentContextPort,
+    private readonly llm: ILLMPort
+  ) {}
+
+  async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
+    const ctx = await this.context.getContext();
+    const todayDate = new Date().toISOString().slice(0, 10);
+    const systemPrompt = buildSystemPrompt(ctx, todayDate);
+    const messages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      ...history,
+      { role: 'user', content: userMessage },
+    ];
+    let reply = await this.llm.chat(messages, AGENT_TOOLS);
+    const toolCalls = parseToolCalls(reply);
+    if (toolCalls.length > 0) {
+      const results = await this.executeTools(toolCalls);
+      const resultText = results.map((r) => `${r.name}: ${r.result}`).join('\n');
+      messages.push({ role: 'assistant', content: reply });
+      messages.push({
+        role: 'user',
+        content: `Tool results:\n${resultText}`,
+      });
+      reply = await this.llm.chat(messages);
+    }
+    return reply;
+  }
+
+  private async executeTools(calls: ToolCall[]): Promise<{ name: string; result: string }[]> {
+    const logUseCase = new LogUseCase(this.logs);
+    const todosUseCase = new TodosUseCase(this.todos);
+    const out: { name: string; result: string }[] = [];
+    for (const call of calls) {
+      try {
+        const result = await this.executeOne(call, logUseCase, todosUseCase);
+        out.push({ name: call.name, result });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        out.push({ name: call.name, result: 'Error: ' + msg });
+      }
+    }
+    return out;
+  }
+
+  private async executeOne(
+    call: ToolCall,
+    logUseCase: LogUseCase,
+    todosUseCase: TodosUseCase
+  ): Promise<string> {
+    const { name, args } = call;
+    switch (name) {
+      case 'get_logs': {
+        const from = String(args.from ?? '');
+        const to = String(args.to ?? '');
+        const list = await this.logs.findByDateRange(from, to);
+        if (list.length === 0) {
+          return `No log entries between ${from} and ${to}.`;
+        }
+        const lines = list.map(
+          (l) => `- ${l.date}: ${l.content.title || 'Untitled'}${l.content.notes ? ' — ' + (l.content.notes.slice(0, 80) + (l.content.notes.length > 80 ? '…' : '')) : ''}`
+        );
+        return `Found ${list.length} log entr${list.length === 1 ? 'y' : 'ies'} from ${from} to ${to}:\n${lines.join('\n')}`;
+      }
+      case 'apply_log_update': {
+        const date = String(args.date ?? '');
+        const mode = String(args.mode ?? '');
+        const existing = await this.logs.findByDate(date);
+        if (mode === 'create') {
+          if (existing) {
+            return 'Error: Log already exists for this date. Use single_field or summarize instead.';
+          }
+          const sleepNotes =
+            args.sleep_notes !== undefined && String(args.sleep_notes).trim() !== ''
+              ? String(args.sleep_notes).trim()
+              : args.notes !== undefined && String(args.notes).trim() !== ''
+                ? String(args.notes).trim()
+                : undefined;
+          const mood = typeof args.mood === 'number' && Number.isFinite(args.mood) ? args.mood : undefined;
+          const energy = typeof args.energy === 'number' && Number.isFinite(args.energy) ? args.energy : undefined;
+          if (!sleepNotes || mood === undefined || energy === undefined) {
+            const missing: string[] = [];
+            if (!sleepNotes) missing.push('sleeping record (sleep_notes or notes)');
+            if (mood === undefined) missing.push('mood');
+            if (energy === undefined) missing.push('energy budget');
+            return `Error: Create requires ${missing.join(', ')}.`;
+          }
+          const title = args.title !== undefined && String(args.title).trim() !== '' ? String(args.title).trim() : undefined;
+          const result = await logUseCase.upsert({
+            date,
+            title,
+            notes: sleepNotes,
+            mood,
+            energy,
+          });
+          return result.created
+            ? `Created log for ${date}${title ? `: "${title}"` : ''} with sleep, mood, energy.`
+            : `Updated log for ${date}.`;
+        }
+        if (mode === 'single_field') {
+          if (!existing) {
+            return 'Error: No log for this date. Create it first (sleep, mood, energy) using mode create.';
+          }
+          const field = String(args.field ?? '').trim();
+          const rawValue = args.value;
+          if (!field) return 'Error: single_field requires field and value.';
+          const parsed = parseSingleFieldValue(field, rawValue);
+          if (parsed === undefined) {
+            return `Error: Unknown or unsupported field "${field}" or invalid value.`;
+          }
+          await logUseCase.upsert({ date, ...parsed });
+          return `Updated ${field} for ${date}.`;
+        }
+        if (mode === 'summarize') {
+          if (!existing) {
+            return 'Error: No log for this date. Create it first (sleep, mood, energy) using mode create.';
+          }
+          const score = typeof args.score === 'number' && Number.isFinite(args.score) ? args.score : undefined;
+          const title = args.title !== undefined && String(args.title).trim() !== '' ? String(args.title).trim() : undefined;
+          const wentWell = args.went_well !== undefined && args.went_well !== '' ? String(args.went_well) : undefined;
+          const improve = args.improve !== undefined && args.improve !== '' ? String(args.improve) : undefined;
+          const gratitude = args.gratitude !== undefined && args.gratitude !== '' ? String(args.gratitude) : undefined;
+          const tomorrow = args.tomorrow !== undefined && args.tomorrow !== '' ? String(args.tomorrow) : undefined;
+          const energy = typeof args.energy === 'number' && Number.isFinite(args.energy) ? args.energy : undefined;
+          if (
+            score === undefined ||
+            !title ||
+            !wentWell ||
+            !improve ||
+            !gratitude ||
+            !tomorrow ||
+            energy === undefined
+          ) {
+            const missing: string[] = [];
+            if (score === undefined) missing.push('score');
+            if (!title) missing.push('title');
+            if (!wentWell) missing.push('went_well');
+            if (!improve) missing.push('improve');
+            if (!gratitude) missing.push('gratitude');
+            if (!tomorrow) missing.push('tomorrow');
+            if (energy === undefined) missing.push('energy');
+            return `Error: Summarize requires all of: ${missing.join(', ')}.`;
+          }
+          const notes = args.notes !== undefined && String(args.notes).trim() !== '' ? String(args.notes).trim() : undefined;
+          await logUseCase.upsert({
+            date,
+            score,
+            title,
+            wentWell,
+            improve,
+            gratitude,
+            tomorrow,
+            energy,
+            notes,
+          });
+          return `Summarized log for ${date}: "${title}".`;
+        }
+        return `Error: Unknown mode "${mode}". Use create, single_field, or summarize.`;
+      }
+      case 'upsert_log': {
+        const date = String(args.date ?? '');
+        const title = args.title !== undefined && args.title !== '' ? String(args.title) : undefined;
+        const notes = args.notes !== undefined && args.notes !== '' ? String(args.notes) : undefined;
+        const score = typeof args.score === 'number' && Number.isFinite(args.score) ? args.score : undefined;
+        const mood = typeof args.mood === 'number' && Number.isFinite(args.mood) ? args.mood : undefined;
+        const energy = typeof args.energy === 'number' && Number.isFinite(args.energy) ? args.energy : undefined;
+        const deepWorkHours =
+          typeof args.deep_work_hours === 'number' && Number.isFinite(args.deep_work_hours)
+            ? args.deep_work_hours
+            : undefined;
+        const workout = typeof args.workout === 'boolean' ? args.workout : undefined;
+        const diet = typeof args.diet === 'boolean' ? args.diet : undefined;
+        const readingMins =
+          typeof args.reading_mins === 'number' && Number.isFinite(args.reading_mins) ? args.reading_mins : undefined;
+        const wentWell = args.went_well !== undefined && args.went_well !== '' ? String(args.went_well) : undefined;
+        const improve = args.improve !== undefined && args.improve !== '' ? String(args.improve) : undefined;
+        const gratitude = args.gratitude !== undefined && args.gratitude !== '' ? String(args.gratitude) : undefined;
+        const tomorrow = args.tomorrow !== undefined && args.tomorrow !== '' ? String(args.tomorrow) : undefined;
+        const result = await logUseCase.upsert({
+          date,
+          title,
+          notes,
+          score,
+          mood,
+          energy,
+          deepWorkHours,
+          workout,
+          diet,
+          readingMins,
+          wentWell,
+          improve,
+          gratitude,
+          tomorrow,
+        });
+        return result.created
+          ? `Created a new log for ${date}${title ? `: "${title}"` : ''}.`
+          : `Updated the log for ${date}${title ? `: "${title}"` : ''}.`;
+      }
+      case 'list_todos': {
+        const list = args.include_done ? await todosUseCase.listAll() : await todosUseCase.listOpen();
+        if (list.length === 0) {
+          return args.include_done ? 'No TODOs in the list.' : 'No open tasks.';
+        }
+        const lines = list.map((t, i) => {
+          const due = t.dueDate ? ` (due ${t.dueDate})` : '';
+          const cat = t.category ? ` [${t.category}]` : '';
+          const pri = t.priority ? ` [${t.priority}]` : '';
+          const notesHint = t.notes ? ` — ${t.notes.slice(0, 40)}${t.notes.length > 40 ? '…' : ''}` : '';
+          const status = args.include_done ? ` [${t.status}]` : '';
+          return `${i + 1}. ${t.title}${due}${cat}${pri}${notesHint}${status}`;
+        });
+        const kind = args.include_done ? 'tasks' : 'open tasks';
+        return `${list.length} ${kind}:\n${lines.join('\n')}`;
+      }
+      case 'add_todo': {
+        const title = String(args.title ?? '');
+        const category = parseCategory(args.category);
+        const dueDate = args.due_date ? String(args.due_date) : null;
+        const notes = args.notes !== undefined && args.notes !== '' ? String(args.notes) : undefined;
+        const priority = parsePriority(args.priority);
+        await todosUseCase.add({ title, category, dueDate, notes, priority });
+        const parts = [`Added "${title}" [${category}]`];
+        if (dueDate) parts.push(`due ${dueDate}`);
+        if (notes) parts.push('with notes');
+        if (priority) parts.push(priority);
+        return parts.join(', ') + '.';
+      }
+      case 'add_todos': {
+        const raw = args.tasks;
+        const tasks = Array.isArray(raw) ? raw : [];
+        const results: string[] = [];
+        for (const t of tasks) {
+          if (t && typeof t === 'object' && 'title' in t) {
+            const title = String((t as { title?: unknown }).title ?? '');
+            const category = parseCategory((t as { category?: unknown }).category);
+            const dueDate = (t as { due_date?: unknown }).due_date
+              ? String((t as { due_date: unknown }).due_date)
+              : null;
+            const notes = (t as { notes?: unknown }).notes !== undefined && (t as { notes: unknown }).notes !== ''
+              ? String((t as { notes: unknown }).notes)
+              : undefined;
+            const priority = parsePriority((t as { priority?: unknown }).priority);
+            if (title) {
+              await todosUseCase.add({ title, category, dueDate, notes, priority });
+              const extra: string[] = [];
+              if (dueDate) extra.push(`due ${dueDate}`);
+              if (notes) extra.push('notes');
+              if (priority) extra.push(priority);
+              results.push(extra.length ? `"${title}" [${category}] (${extra.join(', ')})` : `"${title}" [${category}]`);
+            }
+          }
+        }
+        if (results.length === 0) return 'No valid tasks to add.';
+        return `Added ${results.length} task${results.length === 1 ? '' : 's'}: ${results.join(', ')}.`;
+      }
+      case 'update_todo': {
+        const idOrIndex = String(args.id_or_index ?? '');
+        const patch: {
+          title?: string;
+          category?: ReturnType<typeof parseCategory>;
+          dueDate?: string | null;
+          notes?: string;
+          priority?: ReturnType<typeof parsePriority>;
+        } = {};
+        if (args.title !== undefined && args.title !== '') patch.title = String(args.title);
+        if (args.category !== undefined) patch.category = parseCategory(args.category);
+        if (args.due_date !== undefined) patch.dueDate = args.due_date === '' ? null : String(args.due_date);
+        if (args.notes !== undefined) patch.notes = String(args.notes);
+        if (args.priority !== undefined) patch.priority = parsePriority(args.priority);
+        if (Object.keys(patch).length === 0) return 'No changes given for that task.';
+        await todosUseCase.updateByIdOrIndex(idOrIndex, patch);
+        const parts = ['Updated that task'];
+        if (patch.title) parts.push(`title to "${patch.title}"`);
+        if (patch.category) parts.push(`category ${patch.category}`);
+        if (patch.dueDate !== undefined) parts.push(patch.dueDate ? `due ${patch.dueDate}` : 'cleared due date');
+        if (patch.notes !== undefined) parts.push('notes');
+        if (patch.priority) parts.push(`priority ${patch.priority}`);
+        return parts.join('; ') + '.';
+      }
+      case 'delete_todo': {
+        const idOrIndex = String(args.id_or_index ?? '');
+        await todosUseCase.deleteByIdOrIndex(idOrIndex);
+        return 'Deleted that task.';
+      }
+      case 'complete_todo': {
+        const idOrIndex = String(args.id_or_index ?? '');
+        await todosUseCase.completeByIdOrIndex(idOrIndex);
+        return 'Marked that task as done.';
+      }
+      default:
+        return "That tool isn't available.";
+    }
+  }
+}
+
+function buildSystemPrompt(
+  ctx: { rules: string; docs: string[]; skills: string[] },
+  todayDate: string
+): string {
+  const parts = [
+    '## Persona',
+    'You are a friendly, calm personal assistant—like a helpful friend who remembers their journal and tasks. Talk like a real person: warm and natural, not like a bot. Avoid stiff or robotic replies (e.g. "Task added.", "Done.", or repeating back exactly what they said). No canned phrases, bullet lists, or templates unless the user asks. Respond from the conversation and what you just did; keep it human and concise.',
+    '',
+    '## Context',
+    `Today's date is ${todayDate}. Use get_logs with from and to equal this date to see if a log exists for today.`,
+    '',
+    '## Data',
+    'Every field in their logs and tasks is meaningful to them. Preserve existing data: only update the specific field(s) the user mentioned or provided; never clear or overwrite other fields. When summarizing or referring to their day, do not drop or ignore any field they care about (sleep, mood, score, workout, hours, tasks done/undone, etc.). For how to update logs without bugs (single-field vs summarize, which fields to send), follow the **Rules** and **Docs** below—they are the source of truth.',
+    '',
+    '## Your jobs',
+    '1. **Tasks (to-do list)** – Add, list, update, complete, and delete tasks. Use add_todo or add_todos, update_todo, delete_todo, complete_todo. Never put tasks in the journal. Keep tasks out of log updates.',
+    '2. **Journal (daily log)** – One log per calendar day. Use **apply_log_update** for all log writes (do not use upsert_log for journal updates). Three modes: **create** (when no log exists—requires sleep_notes, mood, energy; ask user only for sleep and mood; **derive energy from daily check-in** (sleep, mood, yesterday\'s overview), do not ask for energy); **single_field** (when log exists and user mentioned one thing—field + value only); **summarize** (when log exists and end of day or user asks—all of score, title, went_well, improve, gratitude, tomorrow, energy). If get_logs shows no log for that date, create first with mode create; only then use single_field or summarize. See **Rules** and **Docs** for the full procedure.',
+    '3. **Task extraction** – You can extract as many tasks as the user mentions. Every task must have a category (Work, Health, Personal, Learning)—always set it; infer from context if the user does not say. Add due_date when they mention a date; add notes when they give context or something to remember about the task (notes help remind them). Set priority when they say it or infer from urgency. After adding, confirm how many tasks you added.',
+    '4. **Delete task** – When the user wants to delete or remove a task, first identify it (e.g. by listing and matching title or index). Then ask for confirmation by stating the exact task title: "Do you want to delete the task \'…\'?" Only call delete_todo after they confirm (yes, please, etc.).',
+    '5. **Summarize** – When user says they\'re wrapping up or asks for a summary, use apply_log_update with mode summarize (log must already exist; create first if not). Fill all required fields; then in your reply give the short overall line and list **done & undone tasks** (list_todos with include_done). Gratitude: capture their words; tomorrow: your reprioritized recommendation from tasks and context.',
+    '6. **New day** – When they are starting the day (e.g. first message, good morning), offer a brief summary (today’s focus or a one-line yesterday) and help them get oriented.',
+    '7. **No log for today** – If get_logs shows no entry for today, ask only for **sleep** (how they slept) and **mood after they woke up**. Do not ask for energy budget. Derive energy from daily check-in (sleep, mood, yesterday\'s overview) and call apply_log_update with mode create (sleep_notes, mood, derived energy). Keep it brief.',
+    '8. **Single-field and tasks** – When the user mentions only one log thing (e.g. "I did a workout", "worked 5 hours"), use apply_log_update with mode single_field and that field + value. Same for tasks: use update_todo with only the property they mentioned.',
+    '9. **Energy budget** – The energy field is the **energy budget for that day** (1–10). Do **not** ask the user for it. It comes from **daily check-in**: derive from sleep (notes), waking mood, and optionally yesterday\'s overview (get_logs for yesterday). When updating energy later, use yesterday\'s overview as one input.',
+    '',
+    '## Responding',
+    'Be friendly and conversational. Reply in full sentences, in your own words—as if you’re chatting, not filing a report. Match their tone and energy. After using tools, say something that fits the moment (e.g. a short acknowledgment, a follow-up question, or a light comment) instead of robotic confirmations or raw output. Only call tools when their intent is clear; when you change something (e.g. add a task, update the journal), mention it naturally in the flow of the reply.',
+    '',
+    '## Rules',
+    ctx.rules,
+  ];
+  if (ctx.skills.length) parts.push('\n## Skills\n' + ctx.skills.join('\n'));
+  if (ctx.docs.length) parts.push('\n## Docs (reference)\n' + ctx.docs.slice(0, 3).join('\n'));
+  return parts.join('\n');
+}
+
+/** Parse human-readable TOOL_CALLS: [{"name":"...","args":{...}}] or TOOL_CALLS: {"name":"...","args":{...}} */
+function parseToolCalls(reply: string): ToolCall[] {
+  const calls: ToolCall[] = [];
+  const prefix = /TOOL_CALLS?:\s*/i;
+  const idx = reply.search(prefix);
+  if (idx < 0) return calls;
+  const afterPrefix = reply.slice(idx + reply.match(prefix)![0].length);
+  const jsonStart = afterPrefix.search(/[\[{]/);
+  if (jsonStart < 0) return calls;
+  const open = afterPrefix[jsonStart] as '[' | '{';
+  const close = open === '[' ? ']' : '}';
+  let depth = 1;
+  let end = jsonStart + 1;
+  for (; end < afterPrefix.length && depth > 0; end++) {
+    const c = afterPrefix[end];
+    if (c === open) depth++;
+    else if (c === close) depth--;
+  }
+  if (depth !== 0) return calls;
+  const jsonStr = afterPrefix.slice(jsonStart, end);
+  try {
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown> | Record<string, unknown>[];
+    const arr = Array.isArray(parsed) ? parsed : [parsed];
+    for (const item of arr) {
+      if (item && typeof item === 'object' && 'name' in item && 'args' in item) {
+        calls.push({ name: String(item.name), args: (item.args as Record<string, unknown>) ?? {} });
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return calls;
+}
