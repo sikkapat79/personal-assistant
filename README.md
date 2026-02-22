@@ -67,6 +67,8 @@ The `daily` script runs `journal today`. Optionally use `node-notifier` or `osas
 - **domain/** – entities (DailyLog, Todo), value objects. No I/O.
 - **application/ports/** – ILogsRepository, ITodosRepository, etc.
 - **application/use-cases/** – log, todos, agent (orchestration only).
-- **adapters/inbound/cli/** – CLI entry, interactive prompt, and TUI (tui-app.tsx).
+- **adapters/inbound/cli/** – CLI entry (`index.ts`), interactive prompt, and TUI. TUI is split into a thin entry and a module:
+  - **tui-app.tsx** – entry only: create CLI renderer, mount `<AppRoot />`.
+  - **tui/** – TUI module (one function/component per file): `App.tsx`, `AppRoot.tsx`, hooks (`useAgent`, `useSpinner`, `usePaxAnimationFrame`), small components (`FirstRunSetupContent`, `ColumnScanningContent`, `ColumnMappingContent`, `SettingsPageContent`), utils (`energyBarSegments`, `getPaxMood`, `clearConsole`, `normalizeError`, `formatTodayLoadError`, `maskSecret`, `typeableChar`), **tui/constants/** (spinner, tips, pax, setup, layout), **tui/types.ts**.
 - **adapters/outbound/notion/** – Notion API adapters.
 - **agent-context/** – editable docs, rules, and skills for the agent (data rules, journal/task reference). Loaded each run; edit to change agent behaviour without code changes.

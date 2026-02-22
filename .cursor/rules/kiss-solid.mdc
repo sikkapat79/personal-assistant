@@ -1,0 +1,15 @@
+---
+description: KISS and SOLID design principles for the codebase
+globs: "**/*.ts,**/*.tsx"
+alwaysApply: true
+---
+
+# KISS & SOLID
+
+- **KISS (Keep It Simple, Stupid)**: Prefer the simplest solution that works. Avoid unnecessary abstraction, indirection, or cleverness. If in doubt, choose the option that is easier to read and change later.
+- **SOLID**:
+  - **S**ingle responsibility: one reason to change per module/class.
+  - **O**pen/closed: extend via new code (e.g. new adapters), not by editing existing code.
+  - **L**iskov substitution: subtypes must be substitutable for their base types.
+  - **I**nterface segregation: small, focused interfaces (e.g. ports) over one big interface.
+  - **D**ependency inversion: depend on abstractions (ports/interfaces), not concrete adapters; composition wires implementations.
