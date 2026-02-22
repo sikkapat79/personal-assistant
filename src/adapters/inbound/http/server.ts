@@ -4,7 +4,7 @@
  */
 import express from 'express';
 import { compose } from '../../../composition';
-import { todayLogDate } from '../../../domain/value-objects/LogDate';
+import { todayLogDate } from '../../../domain/value-objects/log-date';
 
 const app = express();
 app.use(express.json());

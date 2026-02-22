@@ -1,7 +1,7 @@
 import type { ITodosRepository, TodoUpdatePatch } from '../ports/ITodosRepository';
-import type { Todo } from '../../domain/entities/Todo';
-import type { TodoId } from '../../domain/value-objects/TodoId';
-import { createTodo } from '../../domain/entities/Todo';
+import type { Todo } from '../../domain/entities/todo';
+import type { TodoId } from '../../domain/value-objects/todo-id';
+import { createTodo } from '../../domain/entities/todo';
 import type { TodoItemDto, TodoAddInputDto } from '../dto/todo-dto';
 
 export class TodosUseCase {

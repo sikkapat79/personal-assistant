@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { compose } from '../../../composition';
 import { AGENT_NAME } from '../../../config/branding';
-import { todayLogDate } from '../../../domain/value-objects/LogDate';
+import { todayLogDate } from '../../../domain/value-objects/log-date';
 import { runInteractive } from './interactive';
 import { createSpinner, say, sayError } from './ui';
 

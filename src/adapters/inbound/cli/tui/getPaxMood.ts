@@ -1,4 +1,4 @@
-import type { DailyLog } from '../../../../domain/entities/DailyLog';
+import type { DailyLog } from '../../../../domain/entities/daily-log';
 import type { PaxMood } from './constants/pax';
 
 export function getPaxMood(

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react';
 import { TextAttributes } from '@opentui/core';
 import { useKeyboard, useRenderer, useAppContext } from '@opentui/react';
-import type { DailyLog } from '../../../../domain/entities/DailyLog';
+import type { DailyLog } from '../../../../domain/entities/daily-log';
 import { getResolvedConfig, hasRequiredConfig } from '../../../../config/resolved';
 import { saveProfile } from '../../../../config/profile';
 import { loadSettings, saveSettings } from '../../../../config/settings';

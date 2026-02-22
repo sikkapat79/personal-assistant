@@ -1,9 +1,9 @@
 import type { ILogsRepository } from '../../../application/ports/ILogsRepository';
-import type { DailyLog } from '../../../domain/entities/DailyLog';
-import type { LogDate } from '../../../domain/value-objects/LogDate';
+import type { DailyLog } from '../../../domain/entities/daily-log';
+import type { LogDate } from '../../../domain/value-objects/log-date';
 import type { LogsColumns } from './client';
-import { createDailyLog } from '../../../domain/entities/DailyLog';
-import { createLogContent } from '../../../domain/value-objects/LogContent';
+import { createDailyLog } from '../../../domain/entities/daily-log';
+import { createLogContent } from '../../../domain/value-objects/log-content';
 import { getNotionClient } from './client';
 
 /** Notion adapter for logs: uses database_id and full column mapping from config. */

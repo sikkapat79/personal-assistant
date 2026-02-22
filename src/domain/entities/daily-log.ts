@@ -1,5 +1,5 @@
-import type { LogDate } from '../value-objects/LogDate';
-import type { LogContent } from '../value-objects/LogContent';
+import type { LogDate } from '../value-objects/log-date';
+import type { LogContent } from '../value-objects/log-content';
 
 /** Aggregate root: one log per date (identity = LogDate). */
 export interface DailyLog {
