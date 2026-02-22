@@ -25,6 +25,12 @@ const TIPS = [
   '? for shortcuts · Ctrl+P: Profile & Settings · Ctrl+C to exit',
 ];
 
+/** Energy 1–10 to filled/empty bar segments (10 chars total). */
+function energyBarSegments(energy: number): { filled: string; empty: string } {
+  const value = Math.min(10, Math.max(0, Math.round(energy)));
+  return { filled: '█'.repeat(value), empty: '░'.repeat(10 - value) };
+}
+
 /** Animation tick for Pax face (slower than spinner so it stays calm). */
 const PAX_ANIMATION_TICK_MS = 240;
 
@@ -801,7 +807,17 @@ function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
           <box style={{ flexDirection: 'column', borderStyle: 'single', padding: 1, marginBottom: 1 }}>
             <text style={{ attributes: TextAttributes.BOLD }}>PA</text>
             <text fg={designTokens.color.muted}>Self-discipline journal</text>
-            <text>Welcome back, {userName}</text>
+            <box style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <text>Welcome back, {userName}</text>
+              {todayLog && todayLog !== 'loading' && todayLog.content.energy != null && (
+                <box style={{ flexDirection: 'row' }}>
+                  <text fg={designTokens.color.muted}>Your energy </text>
+                  <text fg={designTokens.color.accent}>{energyBarSegments(todayLog.content.energy).filled}</text>
+                  <text fg={designTokens.color.muted}>{energyBarSegments(todayLog.content.energy).empty}</text>
+                  <text fg={designTokens.color.muted}> {todayLog.content.energy}/10</text>
+                </box>
+              )}
+            </box>
             <box style={{ marginTop: 1 }}>
               <text fg={designTokens.color.accent}>{paxFrame}</text>
             </box>
