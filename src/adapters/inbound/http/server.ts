@@ -1,6 +1,6 @@
 /**
  * Optional minimal local HTTP UI (Phase 7).
- * Same use cases as CLI; run: npm run ui → http://localhost:3000
+ * Same use cases as CLI; run: bun run ui → http://localhost:3000
  */
 import express from 'express';
 import { compose } from '../../../composition';

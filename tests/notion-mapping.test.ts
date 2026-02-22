@@ -1,7 +1,7 @@
 /**
  * Test that Notion DB mapping (IDs + columns) is correct.
  * Loads NOTION_* from env (e.g. .env); validates both DBs and column names exist.
- * Run: npm run test:notion-mapping   or   npm run ping
+ * Run: bun run test:notion-mapping   or   bun run ping
  */
 import {
   loadNotionConfig,

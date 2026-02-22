@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
     "moduleResolution": "Bundler",
     "outDir": "dist",
     "rootDir": "src",

@@ -1,6 +1,6 @@
 /**
  * Tests for TUI activity box scroll logic (same as tui-app.tsx).
- * Run: node tests/tui-activity-scroll.test.mjs
+ * Run: bun tests/tui-activity-scroll.test.mjs
  */
 const ACTIVITY_VISIBLE_LINES = 6;
 

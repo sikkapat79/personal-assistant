@@ -2,7 +2,7 @@
  * Test that we can get (fetch) logs and/or todos from Notion.
  * Loads NOTION_* from env; composes adapters and runs one read per DB.
  * Passes if at least one of logs or todos can be fetched.
- * Run: npm run test:notion-fetch
+ * Run: bun run test:notion-fetch
  */
 import { compose } from '../src/composition';
 

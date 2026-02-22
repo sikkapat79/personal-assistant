@@ -7,21 +7,19 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "journal": "tsx src/adapters/inbound/cli/index.ts",
-    "start": "tsx src/adapters/inbound/cli/index.ts",
-    "ping": "tsx src/adapters/inbound/cli/index.ts ping",
-    "daily": "tsx src/adapters/inbound/cli/index.ts today",
-    "today": "tsx src/adapters/inbound/cli/index.ts today",
-    "ui": "tsx src/adapters/inbound/http/server.ts",
-    "journal:bun": "bun run src/adapters/inbound/cli/index.ts",
-    "ui:bun": "bun run src/adapters/inbound/http/server.ts",
-    "tui": "tsx src/adapters/inbound/cli/tui-app.tsx",
-    "test:tui-scroll": "node tests/tui-activity-scroll.test.mjs",
-    "test:notion-mapping": "tsx tests/notion-mapping.test.ts",
-    "test:notion-fetch": "tsx tests/notion-fetch.test.ts"
+    "journal": "bun run src/adapters/inbound/cli/index.ts",
+    "start": "bun run src/adapters/inbound/cli/index.ts",
+    "ping": "bun run src/adapters/inbound/cli/index.ts ping",
+    "daily": "bun run src/adapters/inbound/cli/index.ts today",
+    "today": "bun run src/adapters/inbound/cli/index.ts today",
+    "ui": "bun run src/adapters/inbound/http/server.ts",
+    "tui": "bun run src/adapters/inbound/cli/tui-app.tsx",
+    "test:tui-scroll": "bun tests/tui-activity-scroll.test.mjs",
+    "test:notion-mapping": "bun tests/notion-mapping.test.ts",
+    "test:notion-fetch": "bun tests/notion-fetch.test.ts"
   },
   "engines": {
-    "node": ">=18"
+    "bun": ">=1.0.0"
   },
   "bin": {
     "journal": "bin/journal.mjs"
@@ -35,19 +33,20 @@
   "license": "MIT",
   "dependencies": {
     "@notionhq/client": "^2.2.15",
+    "@opentui/core": "^0.1.81",
+    "@opentui/react": "^0.1.81",
     "express": "^4.18.2",
-    "ink": "^5.2.1",
     "openai": "^6.22.0",
     "ora": "^8.0.1",
     "prompts": "^2.4.2",
-    "react": "^18.3.1"
+    "react": "^19",
+    "react-dom": "^19"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^20.10.0",
     "@types/prompts": "^2.4.9",
-    "@types/react": "^18.3.28",
-    "tsx": "^4.7.0",
+    "@types/react": "^19",
     "typescript": "^5.3.0"
   }
 }

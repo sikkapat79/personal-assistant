@@ -1,30 +1,12 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { render, Box, Text, useInput, useApp } from 'ink';
+import { createCliRenderer, TextAttributes } from '@opentui/core';
+import { createRoot, useKeyboard, useRenderer } from '@opentui/react';
 import { compose } from '../../../composition';
 import type { DailyLog } from '../../../domain/entities/DailyLog';
 
-/** Frame-based spinner for loading/thinking. No extra deps. */
+/** Frame-based spinner for loading/thinking. */
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-const SPINNER_INTERVAL_MS = 80;
-
-function useSpinner(active: boolean): string {
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), SPINNER_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [active]);
-  return SPINNER_FRAMES[frame];
-}
-
-function useCursorBlink(): boolean {
-  const [visible, setVisible] = useState(true);
-  useEffect(() => {
-    const id = setInterval(() => setVisible((v) => !v), 530);
-    return () => clearInterval(id);
-  }, []);
-  return visible;
-}
+const SPINNER_TICK_MS = 150;
 
 const TIPS = [
   'Type a message and press Enter to talk to the agent.',
@@ -41,25 +23,19 @@ const ROBOT = `
 `.trim();
 
 const FAKE_ENV_HINT =
-  'To try without Notion: NOTION_API_KEY=x NOTION_LOGS_DATABASE_ID=x NOTION_TODOS_DATABASE_ID=x npm run tui';
+  'To try without Notion: NOTION_API_KEY=x NOTION_LOGS_DATABASE_ID=x NOTION_TODOS_DATABASE_ID=x bun run tui';
 
-/** Visible lines in the Recent activity box only (scrollable with ↑↓). */
 const ACTIVITY_VISIBLE_LINES = 8;
-
-/** Fixed height for Last response area (same prominence as landing block). */
 const LAST_RESPONSE_LINES = 6;
 
-/** Clear terminal screen and move cursor to top (ANSI). */
 function clearConsole(): void {
   process.stdout.write('\x1b[2J\x1b[H');
 }
 
-/** Normalize error for display: first line, no stack, truncate. */
 function normalizeError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   const firstLine = msg.split('\n')[0].trim();
-  const max = 120;
-  return firstLine.length > max ? firstLine.slice(0, max) + '…' : firstLine;
+  return firstLine.length > 120 ? firstLine.slice(0, 120) + '…' : firstLine;
 }
 
 function useAgent() {
@@ -70,15 +46,31 @@ function useAgent() {
       return { composition: null, error: e instanceof Error ? e.message : String(e) };
     }
   });
-  if (state.error) return { agent: null, logs: null, todos: null, logUseCase: null, error: state.error };
-  if (state.composition) return { agent: state.composition.agentUseCase, logs: state.composition.logs, todos: state.composition.todosUseCase, logUseCase: state.composition.logUseCase, error: null };
+  if (state.error)
+    return { agent: null, logs: null, todos: null, logUseCase: null, error: state.error };
+  if (state.composition)
+    return {
+      agent: state.composition.agentUseCase,
+      logs: state.composition.logs,
+      todos: state.composition.todosUseCase,
+      logUseCase: state.composition.logUseCase,
+      error: null,
+    };
   return { agent: null, logs: null, todos: null, logUseCase: null, error: null };
 }
 
-const NO_LOG_PROMPT = 'No log for today yet. How did you sleep? How\'s your mood after waking up?';
+function useSpinner(active: boolean): string {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), SPINNER_TICK_MS);
+    return () => clearInterval(id);
+  }, [active]);
+  return active ? SPINNER_FRAMES[frame] : SPINNER_FRAMES[0];
+}
 
 function App() {
-  const { exit } = useApp();
+  const renderer = useRenderer();
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
@@ -93,9 +85,7 @@ function App() {
 
   const spinLoading = useSpinner(todayLog === 'loading');
   const spinThinking = useSpinner(thinking);
-  const cursorVisible = useCursorBlink();
 
-  // On open: load only today's log for that specific date. If none, we'll ask the user.
   useEffect(() => {
     if (error || !logs || !todos) {
       if (!error) setTodayLog(null);
@@ -111,12 +101,13 @@ function App() {
         if (!cancelled) setTodayLog(null);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [error, logs, todos]);
 
   const userName = process.env.USER || process.env.USERNAME || 'there';
 
-  // Clear transient error after 6s
   useEffect(() => {
     if (!errorMessage) return;
     const t = setTimeout(() => setErrorMessage(null), 6000);
@@ -130,7 +121,8 @@ function App() {
     if (!line) return;
     if (line === 'exit' || line === 'quit') {
       clearConsole();
-      exit();
+      renderer.destroy();
+      process.exit(0);
       return;
     }
     if (!agent) return;
@@ -150,29 +142,28 @@ function App() {
     } finally {
       setThinking(false);
     }
-  }, [input, agent, history, exit]);
+  }, [input, agent, history, renderer]);
 
-  useInput((input, key) => {
-    if (key.return) {
+  useKeyboard((key) => {
+    if (key.name === 'return') {
       submit();
       return;
     }
-    if (key.ctrl && input === 'c') {
+    if (key.ctrl && key.name === 'c') {
       clearConsole();
-      exit();
+      renderer.destroy();
+      process.exit(0);
       return;
     }
-    if (key.backspace || key.delete) {
+    if (key.name === 'backspace' || key.name === 'delete') {
       setInput((s) => s.slice(0, -1));
       return;
     }
-    const up = key.upArrow || input === '\u001B[A';
-    const down = key.downArrow || input === '\u001B[B';
-    if (up) {
+    if (key.name === 'up') {
       setActivityScroll((s) => Math.max(0, s - 1));
       return;
     }
-    if (down) {
+    if (key.name === 'down') {
       setActivityScroll((s) => {
         const n = recentCountRef.current;
         const maxScroll = Math.max(0, n - ACTIVITY_VISIBLE_LINES);
@@ -180,112 +171,112 @@ function App() {
       });
       return;
     }
-    if (input) {
-      setInput((s) => s + input);
+    if (key.name.length === 1 && !key.ctrl && !key.meta) {
+      setInput((s) => s + key.name);
     }
   });
 
   if (error) {
     return (
-      <Box flexDirection="column" padding={1}>
-        <Text color="red" bold>Could not start</Text>
-        <Text color="red">{error}</Text>
-        <Box marginTop={1}>
-          <Text dimColor>Set NOTION_API_KEY, NOTION_LOGS_DATABASE_ID, NOTION_TODOS_DATABASE_ID in .env (see .env.example).</Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>{FAKE_ENV_HINT}</Text>
-        </Box>
-      </Box>
+      <box style={{ flexDirection: 'column', padding: 1 }}>
+        <text fg="#FF0000" style={{ attributes: TextAttributes.BOLD }}>Could not start</text>
+        <text fg="#FF0000">{error}</text>
+        <box style={{ marginTop: 1 }}>
+          <text fg="#888888">Set NOTION_API_KEY, NOTION_LOGS_DATABASE_ID, NOTION_TODOS_DATABASE_ID in .env (see .env.example).</text>
+        </box>
+        <box style={{ marginTop: 1 }}>
+          <text fg="#888888">{FAKE_ENV_HINT}</text>
+        </box>
+      </box>
     );
   }
 
+  const maxScroll = Math.max(0, recent.length - ACTIVITY_VISIBLE_LINES);
+  const start = Math.min(activityScroll, maxScroll);
+  const activityLines = recent.slice(start, start + ACTIVITY_VISIBLE_LINES);
+
   return (
-    <Box flexDirection="column" padding={1}>
-      <Box flexDirection="row" marginBottom={1}>
-        <Box width="50%" flexDirection="column" paddingRight={2}>
-          <Text bold>PA · Self-discipline journal</Text>
-          <Text>Welcome back {userName}!</Text>
-          <Box marginTop={1}>
-            <Text dimColor>{ROBOT}</Text>
-          </Box>
-          <Text dimColor>Notion logs & TODOs · Agent</Text>
-          <Box marginTop={1} flexDirection="column">
-            <Text bold>Last response</Text>
-            <Box height={LAST_RESPONSE_LINES} overflow="hidden" flexDirection="column" marginTop={0}>
-              {lastReply !== null ? (
-                lastReply.split('\n').slice(0, LAST_RESPONSE_LINES).map((line, i) => (
-                  <Text key={i}>{line}</Text>
-                ))
-              ) : thinking ? (
-                <>
-                  <Text color="yellow">{spinThinking}</Text>
-                  <Text color="yellow"> Thinking…</Text>
-                </>
-              ) : (
-                <Text dimColor>— Ask something to see the agent reply here.</Text>
-              )}
-            </Box>
-          </Box>
-          <Box marginTop={1} flexDirection="column">
-            <Text bold>Today</Text>
+    <box style={{ flexDirection: 'column', padding: 1 }}>
+      <box style={{ flexDirection: 'row', marginBottom: 1 }}>
+        <box style={{ width: '50%', flexDirection: 'column', paddingRight: 2 }}>
+          <text style={{ attributes: TextAttributes.BOLD }}>PA · Self-discipline journal</text>
+          <text>Welcome back {userName}!</text>
+          <box style={{ marginTop: 1 }}>
+            <text fg="#888888">{ROBOT}</text>
+          </box>
+          <text fg="#888888">Notion logs & TODOs · Agent</text>
+          <box style={{ marginTop: 1, flexDirection: 'column' }}>
+            <text style={{ attributes: TextAttributes.BOLD }}>Last response</text>
+            <box style={{ height: LAST_RESPONSE_LINES, overflow: 'hidden', flexDirection: 'column', marginTop: 0 }}>
+              {lastReply !== null
+                ? lastReply
+                    .split('\n')
+                    .slice(0, LAST_RESPONSE_LINES)
+                    .map((line, i) => <text key={i}>{line}</text>)
+                : thinking
+                  ? (
+                    <>
+                      <text fg="#FFFF00">{spinThinking}</text>
+                      <text fg="#FFFF00"> Thinking…</text>
+                    </>
+                    )
+                  : (
+                      <text fg="#888888">— Ask something to see the agent reply here.</text>
+                    )}
+            </box>
+          </box>
+          <box style={{ marginTop: 1, flexDirection: 'column' }}>
+            <text style={{ attributes: TextAttributes.BOLD }}>Today</text>
             {todayLog === 'loading' && (
               <>
-                <Text dimColor>{"\n"}</Text>
-                <Text color="cyan">{spinLoading}</Text>
-                <Text dimColor> Loading…</Text>
+                <text fg="#888888">{'\n'}</text>
+                <text fg="#00FFFF">{spinLoading}</text>
+                <text fg="#888888"> Loading…</text>
               </>
             )}
             {todayLog && todayLog !== 'loading' && (
-              <Text dimColor>{"\n" + (todayLog.content.title || 'Untitled') + (todayLog.content.notes ? ` — ${todayLog.content.notes.slice(0, 50)}${todayLog.content.notes.length > 50 ? '…' : ''}` : '')}</Text>
+              <text fg="#888888">
+                {'\n' + (todayLog.content.title || 'Untitled') + (todayLog.content.notes ? ` — ${todayLog.content.notes.slice(0, 50)}${todayLog.content.notes.length > 50 ? '…' : ''}` : '')}
+              </text>
             )}
             {!todayLog && (
-              <Text dimColor>{"\nNo log for today yet.\nHow did you sleep? How's your mood after waking up?"}</Text>
+              <text fg="#888888">{"\nNo log for today yet.\nHow did you sleep? How's your mood after waking up?"}</text>
             )}
-          </Box>
-        </Box>
-        <Box width="50%" flexDirection="column" borderStyle="single" paddingX={1}>
-          <Text bold>Tips</Text>
+          </box>
+        </box>
+        <box style={{ width: '50%', flexDirection: 'column', borderStyle: 'single', paddingLeft: 1, paddingRight: 1 }}>
+          <text style={{ attributes: TextAttributes.BOLD }}>Tips</text>
           {TIPS.map((t, i) => (
-            <Text key={i} dimColor>{t}</Text>
+            <text key={i} fg="#888888">{t}</text>
           ))}
-          <Box marginTop={1}>
-            <Text bold>Recent activity</Text>
-            {recent.length > ACTIVITY_VISIBLE_LINES && (
-              <Text dimColor> ↑↓ scroll</Text>
-            )}
-          </Box>
-          <Box height={ACTIVITY_VISIBLE_LINES} overflow="hidden" flexDirection="column">
-            {recent.length === 0 ? (
-              <Text dimColor>No recent activity</Text>
-            ) : (
-              (() => {
-                const maxScroll = Math.max(0, recent.length - ACTIVITY_VISIBLE_LINES);
-                const start = Math.min(activityScroll, maxScroll);
-                return recent
-                  .slice(start, start + ACTIVITY_VISIBLE_LINES)
-                  .map((line, i) => (
-                    <Text key={start + i} dimColor>{line}</Text>
-                  ));
-              })()
-            )}
-          </Box>
-        </Box>
-      </Box>
-      <Box flexDirection="column" borderStyle="single" paddingX={1}>
-        <Text>{'> '}{input}{cursorVisible ? <Text color="cyan">▌</Text> : <Text dimColor> </Text>}</Text>
-      </Box>
+          <box style={{ marginTop: 1 }}>
+            <text style={{ attributes: TextAttributes.BOLD }}>Recent activity</text>
+            {recent.length > ACTIVITY_VISIBLE_LINES && <text fg="#888888"> ↑↓ scroll</text>}
+          </box>
+          <box style={{ height: ACTIVITY_VISIBLE_LINES, overflow: 'hidden', flexDirection: 'column' }}>
+            {recent.length === 0
+              ? <text fg="#888888">No recent activity</text>
+              : activityLines.map((line, i) => (
+                  <text key={start + i} fg="#888888">{line}</text>
+                ))}
+          </box>
+        </box>
+      </box>
+      <box style={{ flexDirection: 'column', borderStyle: 'single', paddingLeft: 1, paddingRight: 1 }}>
+        <text>{'> ' + input + '▌'}</text>
+      </box>
       {errorMessage && (
-        <Box marginTop={1}>
-          <Text color="red">Error: {errorMessage}</Text>
-        </Box>
+        <box style={{ marginTop: 1 }}>
+          <text fg="#FF0000">Error: {errorMessage}</text>
+        </box>
       )}
-      <Box marginTop={1} flexDirection="row" justifyContent="space-between">
-        <Text dimColor>? for shortcuts</Text>
-        {thinking ? <Text color="yellow">{spinThinking} Thinking…</Text> : <Text dimColor>Ready</Text>}
-      </Box>
-    </Box>
+      <box style={{ marginTop: 1, flexDirection: 'row', justifyContent: 'space-between' }}>
+        <text fg="#888888">? for shortcuts</text>
+        {thinking ? <text fg="#FFFF00">{spinThinking} Thinking…</text> : <text fg="#888888">Ready</text>}
+      </box>
+    </box>
   );
 }
 
-render(<App />);
+const renderer = await createCliRenderer({ exitOnCtrlC: true });
+createRoot(renderer).render(<App />);

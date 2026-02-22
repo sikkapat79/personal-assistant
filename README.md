@@ -17,33 +17,32 @@ CLI and optional agent for daily logs and TODOs in Notion.
    - `NOTION_LOGS_DATABASE_ID`
    - `NOTION_TODOS_DATABASE_ID`
    - (Optional) `OPENAI_API_KEY` for the journal agent; `OPENAI_MODEL` defaults to `gpt-4o-mini`.
-6. If your Notion property names differ from the defaults, set column mapping in `.env` (see `.env.example` for all `NOTION_LOGS_*` and `NOTION_TODOS_*` overrides). Run `npm run ping` or `npm run test:notion-mapping` to validate IDs and columns.
+6. If your Notion property names differ from the defaults, set column mapping in `.env` (see `.env.example` for all `NOTION_LOGS_*` and `NOTION_TODOS_*` overrides). Run `bun run ping` or `bun run test:notion-mapping` to validate IDs and columns.
 
-## Run (TypeScript, no build)
+## Run (Bun, no build)
 
-The project runs with **tsx** in transpile mode (no `tsc` build). Imports are plain TypeScript (no `.js` extensions).
+The project runs with **Bun** (TypeScript executed directly, no `tsc` build). Imports are plain TypeScript (no `.js` extensions).
 
-- **Node:** `npm run journal` or `npx tsx src/adapters/inbound/cli/index.ts`
-- **Bun:** `bun run src/adapters/inbound/cli/index.ts` (if you prefer Bun)
+- `bun run journal` or `bun run src/adapters/inbound/cli/index.ts`
 
 ## Commands
 
-- `npm run journal` – interactive menu.
-- `npm run ping` – check connection and validate DB + column mapping (prints configured columns).
-- `npm run test:notion-mapping` – same validation as ping (for CI or scripts).
+- `bun run journal` – interactive menu.
+- `bun run ping` – check connection and validate DB + column mapping (prints configured columns).
+- `bun run test:notion-mapping` – same validation as ping (for CI or scripts).
 - `journal log` – upsert today’s log (Phase 2).
 - `journal todos list | add "..." | complete <id>` – TODOs (Phase 3).
 - `journal today` – today summary.
 - `journal agent` – chat with agent (OpenAI; set `OPENAI_API_KEY` in `.env` to enable).
-- `npm run ui` – optional local HTTP UI at http://localhost:3000 (GET /today, POST /log, GET /todos).
-- `npm run tui` – terminal UI (Ink): welcome panel, tips, recent activity, and agent chat. Run in an interactive terminal (requires TTY).
+- `bun run ui` – optional local HTTP UI at http://localhost:3000 (GET /today, POST /log, GET /todos).
+- `bun run tui` – terminal UI (OpenTUI): welcome panel, tips, recent activity, and agent chat. Run in an interactive terminal (requires TTY).
 
 ## Scheduling (Phase 6)
 
 To run the journal daily (e.g. morning reminder):
 
-- **cron:** `0 8 * * * cd /path/to/pa && npm run daily`
-- **macOS launchd:** create a plist that runs `npm run daily` at a set time.
+- **cron:** `0 8 * * * cd /path/to/pa && bun run daily`
+- **macOS launchd:** create a plist that runs `bun run daily` at a set time.
 
 The `daily` script runs `journal today`. Optionally use `node-notifier` or `osascript` in `scripts/daily-reminder.sh` to show a system notification.
 
