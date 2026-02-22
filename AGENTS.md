@@ -5,7 +5,7 @@ Quick reference for AI agents working on this codebase.
 ## Conventions
 
 - **One function, class, or component per file.** Keep one main export per file; use thin entry points. See `.cursor/rules/one-function-per-file.mdc`.
-- **KISS & SOLID.** Prefer the simplest solution (KISS); follow SOLID (e.g. ports in `application/ports/`, composition wires adapters). See `.cursor/rules/kiss-solid.mdc`.
+- **KISS, DRY & SOLID.** Prefer the simplest solution (KISS); avoid duplication (DRY); follow SOLID (e.g. ports in `application/ports/`, composition wires adapters). See `.cursor/rules/design-principles.mdc`.
 - **TypeScript/Bun.** No build step for running; imports are plain TS. Use existing paths (e.g. `../../../../config/...` from nested folders under `src/`).
 
 ## Structure (src/)
