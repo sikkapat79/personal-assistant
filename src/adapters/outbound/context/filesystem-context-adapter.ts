@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'fs/promises';
 import { join } from 'path';
-import type { IAgentContextPort, AgentContext } from '../../../application/ports/IAgentContextPort';
+import type { IAgentContextPort, AgentContext } from '../../../application/ports/agent-context-port';
 
 const DEFAULT_DIR = join(process.cwd(), 'agent-context');
 

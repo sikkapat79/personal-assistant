@@ -1,7 +1,7 @@
-import type { ILogsRepository } from '../ports/ILogsRepository';
-import type { ITodosRepository } from '../ports/ITodosRepository';
-import type { IAgentContextPort } from '../ports/IAgentContextPort';
-import type { ILLMPort, ChatMessage } from '../ports/ILLMPort';
+import type { ILogsRepository } from '../ports/logs-repository';
+import type { ITodosRepository } from '../ports/todos-repository';
+import type { IAgentContextPort } from '../ports/agent-context-port';
+import type { ILLMPort, ChatMessage } from '../ports/llm-port';
 import type { TodoPriority, TodoCategory, TodoStatus } from '../../domain/entities/todo';
 import type { DailyLog } from '../../domain/entities/daily-log';
 import type { Todo } from '../../domain/entities/todo';

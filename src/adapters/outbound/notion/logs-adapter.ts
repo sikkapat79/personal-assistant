@@ -1,4 +1,4 @@
-import type { ILogsRepository } from '../../../application/ports/ILogsRepository';
+import type { ILogsRepository } from '../../../application/ports/logs-repository';
 import type { DailyLog } from '../../../domain/entities/daily-log';
 import type { LogDate } from '../../../domain/value-objects/log-date';
 import type { LogsColumns } from './client';

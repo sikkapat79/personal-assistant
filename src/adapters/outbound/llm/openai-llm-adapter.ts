@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { ILLMPort, ChatMessage, ToolDefinition } from '../../../application/ports/ILLMPort';
+import type { ILLMPort, ChatMessage, ToolDefinition } from '../../../application/ports/llm-port';
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
 

@@ -1,4 +1,4 @@
-import type { ITodosRepository, TodoUpdatePatch } from '../ports/ITodosRepository';
+import type { ITodosRepository, TodoUpdatePatch } from '../ports/todos-repository';
 import type { Todo } from '../../domain/entities/todo';
 import type { TodoId } from '../../domain/value-objects/todo-id';
 import { createTodo } from '../../domain/entities/todo';
@@ -50,14 +50,16 @@ export class TodosUseCase {
   }
 
   private async resolveIdOrIndex(idOrIndex: string): Promise<TodoId> {
-    const n = parseInt(idOrIndex, 10);
+    const trimmed = idOrIndex.trim();
+    if (!trimmed) throw new Error('Invalid todo index or id: value is empty');
+    const n = parseInt(trimmed, 10);
     if (!Number.isNaN(n) && n >= 1) {
       const open = await this.todos.listOpen();
       const item = open[n - 1];
       if (!item) throw new Error(`No todo at index ${n}`);
       return item.id;
     }
-    return idOrIndex as TodoId;
+    return trimmed as TodoId;
   }
 }
 

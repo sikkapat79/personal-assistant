@@ -1,4 +1,4 @@
-import type { ILogsRepository } from '../ports/ILogsRepository';
+import type { ILogsRepository } from '../ports/logs-repository';
 import type { LogContent } from '../../domain/value-objects/log-content';
 import { createLogDate } from '../../domain/value-objects/log-date';
 import { createLogContent } from '../../domain/value-objects/log-content';
