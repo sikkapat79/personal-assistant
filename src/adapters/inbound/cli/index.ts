@@ -36,7 +36,8 @@ async function runLog(args: string[]): Promise<void> {
       : todayLogDate();
   const title = titleIdx >= 0 && args[titleIdx + 1] ? args[titleIdx + 1] : '';
   const notes = notesIdx >= 0 && args[notesIdx + 1] ? args[notesIdx + 1] : '';
-  const { logUseCase } = compose();
+  const composition = await compose();
+  const { logUseCase } = composition;
   const spinner = createSpinner('Saving…');
   spinner.start();
   const result = await logUseCase.upsert({ date, title, notes });
@@ -44,7 +45,8 @@ async function runLog(args: string[]): Promise<void> {
 }
 
 async function runTodos(args: string[]): Promise<void> {
-  const { todosUseCase } = compose();
+  const composition = await compose();
+  const { todosUseCase } = composition;
   const sub = args[0];
   if (sub === 'list') {
     const all = args.includes('--all');
@@ -89,7 +91,8 @@ async function runTodos(args: string[]): Promise<void> {
 }
 
 async function runAgent(): Promise<void> {
-  const { agentUseCase } = compose();
+  const composition = await compose();
+  const { agentUseCase } = composition;
   const readline = await import('readline');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   say(`Talk to ${AGENT_NAME}. (Set OPENAI_API_KEY in .env to use OpenAI)\n`);
@@ -126,7 +129,8 @@ async function runAgent(): Promise<void> {
 }
 
 async function runToday(): Promise<void> {
-  const { logs, todosUseCase } = compose();
+  const composition = await compose();
+  const { logs, todosUseCase } = composition;
   const today = todayLogDate();
   const spinner = createSpinner('Loading…');
   spinner.start();

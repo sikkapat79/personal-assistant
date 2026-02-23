@@ -7,6 +7,8 @@ export interface Settings {
   NOTION_API_KEY?: string;
   NOTION_LOGS_DATABASE_ID?: string;
   NOTION_TODOS_DATABASE_ID?: string;
+  NOTION_PAGES_PARENT_ID?: string;
+  NOTION_METADATA_DATABASE_ID?: string;
   NOTION_LOGS_TITLE?: string;
   NOTION_LOGS_DATE?: string;
   NOTION_LOGS_SCORE?: string;

@@ -26,7 +26,7 @@ If you prefer not to use the TUI first-run wizard:
 
 1. Create a [Notion integration](https://www.notion.so/my-integrations) and copy the API key.
 2. Create two databases in Notion with these properties (see `src/adapters/outbound/notion/notion-schema.ts` for full purpose and types):
-   - **Logs DB:** Title (title), Date (date), Score (number), Mood (number 1–5), Energy (number 1–10 = energy budget for that day; derived from daily check-in—sleep, mood, yesterday—not asked from user), Deep Work Hours (number), Workout (checkbox), Diet (checkbox), Reading Mins (number), Went Well (text), Improve (text), Gratitude (text), Tomorrow (text). [B] = user paragraphs → app/agent translates. [C] = Tomorrow = TODOs for next day from energy/priority/due.
+   - **Logs DB:** Title (title), Date (date), Score (number), Mood (number 1–5), Energy (number 1–100 = energy budget for that day; derived from daily check-in—sleep, mood, yesterday—not asked from user), Deep Work Hours (number), Workout (checkbox), Diet (checkbox), Reading Mins (number), Went Well (text), Improve (text), Gratitude (text), Tomorrow (text). [B] = user paragraphs → app/agent translates. [C] = Tomorrow = TODOs for next day from energy/priority/due.
    - **TODOs DB:** Title (title), Category (select: Work | Health | Personal | Learning), Due Date (date), Notes (text), Priority (select: High | Medium | Low), Status (checkbox or Status/select). Task status in the app is **Todo**, **In Progress**, **Done**. If the Status column is a select (e.g. Todo | In Progress | Done), the app auto-detects the options; you can override with `NOTION_TODOS_STATUS`, `NOTION_TODOS_DONE_VALUE`, `NOTION_TODOS_OPEN_VALUE`, and `NOTION_TODOS_IN_PROGRESS_VALUE` in `.env` or `~/.pa/settings.json` (see `.env.example`).
 3. Share both databases with your integration (••• → Add connections).
 4. Copy the database IDs from the URLs: `notion.so/workspace/DATABASE_ID?v=...`
@@ -76,6 +76,7 @@ The `daily` script runs `journal today`. Optionally use `node-notifier` or `osas
 ## License and community
 
 - **License:** [MIT](LICENSE).
+- **Support:** [GitHub Sponsors](https://github.com/sponsors/sikkapat79) – optional way to support the project.
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) – setup, conventions, how to send a PR.
 - **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - **Security:** [SECURITY.md](SECURITY.md) – how to report vulnerabilities.
