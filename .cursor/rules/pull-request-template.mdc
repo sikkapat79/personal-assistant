@@ -1,0 +1,16 @@
+---
+description: Follow the PR template when opening pull requests
+globs: ".github/**"
+alwaysApply: true
+---
+
+# Pull request template
+
+When opening or drafting a pull request, **always use and follow** [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
+
+- **Summary**: Provide a brief description of what the PR does.
+- **Type of change**: Tick one of Bug fix, New feature, Documentation, Refactor / chore.
+- **Checklist**: Ensure all items are addressed (conventions, `bun run typecheck`, Notion/config checks if relevant, linked issue).
+- **Additional notes**: Add any optional context.
+
+Do not open or submit a PR without filling out the template; complete every section that applies.

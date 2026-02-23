@@ -143,6 +143,12 @@ export function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
       process.exit(0);
       return;
     }
+    if (line === '/clear') {
+      setHistory([]);
+      setLastReply('History cleared. Starting fresh.');
+      setRecent((r) => ['History cleared.', ...r].slice(0, 8));
+      return;
+    }
     if (!agent) return;
     setThinking(true);
     setLastReply(null);
@@ -508,7 +514,7 @@ export function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
       {showHelp && (
         <box style={{ marginTop: 1, borderStyle: 'single', padding: 1, flexDirection: 'column' }}>
           <text style={{ attributes: TextAttributes.BOLD }}>Shortcuts</text>
-          <text fg={designTokens.color.muted}>{'\n? - this help\nCtrl+P - Profile & Settings\nCtrl+C - exit\n↑ / ↓ - scroll recent activity\n\nPress any key to close'}</text>
+          <text fg={designTokens.color.muted}>{'\n? - this help\n/clear - clear chat history\nCtrl+P - Profile & Settings\nCtrl+C - exit\n↑ / ↓ - scroll recent activity\n\nPress any key to close'}</text>
         </box>
       )}
     </box>

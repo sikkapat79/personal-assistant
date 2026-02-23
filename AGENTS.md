@@ -27,6 +27,10 @@ Quick reference for AI agents working on this codebase.
 
 Log and task behaviour (update modes, preserve data, summarize checklist) is defined in **agent-context/**: see `agent-context/README.md`, `agent-context/rules/data.md`, and `agent-context/docs/journal-and-tasks.md`. Update those files to change how the agent updates logs and tasks.
 
+## Agent chat and session history
+
+Long chat history is handled in **application/use-cases/agent-use-case.ts**: only the last `MAX_RECENT_MESSAGES` (16) messages are sent to the LLM in full; older turns are summarized into a single "Earlier in this session" summary. To avoid re-summarizing on every turn, the use-case uses **incremental caching** on the instance: `lastSummarizedIndex` (length of the prefix already summarized) and `cachedSessionSummary`. When the old-part length has not increased, the cached summary is returned; when it has, only the new slice is summarized and merged with the cache. Cache is invalidated when history is short or shrinks (e.g. after `/clear`). See `buildEffectiveHistory`, `summarizeConversation`, and the cache fields in that file.
+
 ## Commands
 
 - `bun run journal` – interactive CLI.
