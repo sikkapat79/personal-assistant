@@ -92,19 +92,45 @@ export class AgentUseCase {
   /** Max recent messages to send in full; older messages are summarized when history exceeds this. */
   private static readonly MAX_RECENT_MESSAGES = 16;
 
+  /** Length of the history prefix we have already summarized (cache is for history.slice(0, lastSummarizedIndex)). */
+  private lastSummarizedIndex = 0;
+
+  /** Cached summary for that prefix; null when cache is invalid. */
+  private cachedSessionSummary: string | null = null;
+
   /**
    * Returns history to send to the LLM and an optional summary of older turns.
    * When history exceeds MAX_RECENT_MESSAGES, older part is summarized and only recent messages are kept.
+   * Uses incremental caching: only new messages are summarized and merged with the cached summary.
    */
   private async buildEffectiveHistory(
     history: ChatMessage[]
   ): Promise<{ effectiveHistory: ChatMessage[]; sessionSummary: string | null }> {
+    const recent = history.slice(-AgentUseCase.MAX_RECENT_MESSAGES);
     if (history.length <= AgentUseCase.MAX_RECENT_MESSAGES) {
+      this.lastSummarizedIndex = 0;
+      this.cachedSessionSummary = null;
       return { effectiveHistory: history, sessionSummary: null };
     }
-    const oldPart = history.slice(0, history.length - AgentUseCase.MAX_RECENT_MESSAGES);
-    const recent = history.slice(-AgentUseCase.MAX_RECENT_MESSAGES);
-    const sessionSummary = await this.summarizeConversation(oldPart);
+    const L = history.length - AgentUseCase.MAX_RECENT_MESSAGES;
+    if (L < this.lastSummarizedIndex) {
+      this.lastSummarizedIndex = 0;
+      this.cachedSessionSummary = null;
+    }
+    if (L === this.lastSummarizedIndex && this.cachedSessionSummary !== null) {
+      return { effectiveHistory: recent, sessionSummary: this.cachedSessionSummary };
+    }
+    const oldPart = history.slice(0, L);
+    let sessionSummary: string;
+    if (this.lastSummarizedIndex === 0) {
+      sessionSummary = await this.summarizeConversation(oldPart);
+    } else {
+      const newSlice = history.slice(this.lastSummarizedIndex, L);
+      const newSummary = await this.summarizeConversation(newSlice);
+      sessionSummary = `${this.cachedSessionSummary} ${newSummary}`.trim();
+    }
+    this.lastSummarizedIndex = L;
+    this.cachedSessionSummary = sessionSummary;
     return { effectiveHistory: recent, sessionSummary };
   }
 

@@ -10,7 +10,7 @@ Overview of what **Pax** does today and ideas for issues or contributions. You c
 
 - **Daily logs in Notion** – Upsert today’s log; fields: score, mood, energy, deep work hours, workout, diet, reading, went well, improve, gratitude, tomorrow.
 - **TODOs in Notion** – List, add, complete; categories (Work, Health, Personal, Learning), priority (High/Medium/Low), status (Todo, In Progress, Done).
-- **Pax agent** – Chat with an AI that can read/update logs and tasks via tools; behaviour defined in `agent-context/` (rules, docs).
+- **Pax agent** – Chat with an AI that can read/update logs and tasks via tools; behaviour defined in `agent-context/` (rules, docs). Long conversations: last N messages sent in full; older turns summarized and cached per session (incremental summary cache in `agent-use-case.ts`) to avoid repeated LLM summarization.
 - **Partial updates** – Preserve existing log/task data; update only the fields the user or agent provides.
 
 ### Interfaces
