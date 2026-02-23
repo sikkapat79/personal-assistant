@@ -1,0 +1,14 @@
+---
+description: Soft cap on file size; extract by cohesive unit; keep related context close
+globs: "**/*.ts,**/*.tsx"
+alwaysApply: true
+---
+
+# File size and context proximity
+
+- **Soft cap**: When a `.ts`/`.tsx` file exceeds **~300 lines**, treat it as a candidate for splitting. Prefer extracting by **cohesive unit** (one concern per file) rather than arbitrary chunks.
+- **One main export per file** remains (see [one-function-per-file](.cursor/rules/one-function-per-file.mdc)); extracted code should be one function, one class, or one small constant/type module per file.
+- **Context proximity**:
+  - **Within a file**: Keep related logic close. Order sections by "context" (e.g. public API first, then private helpers used only there; or "session history" block, then "tool execution" block).
+  - **When extracting**: Move a **cohesive block** (e.g. all parsing for tool args, or "build system prompt", or one tool's handling) into its own file under a feature folder (e.g. `agent/`), so that everything that belongs to that context lives together.
+- **Reference**: For use-cases that grow large (e.g. agent orchestration), use a **feature subfolder** (e.g. `use-cases/agent/`) for extracted helpers and keep the main use-case file as a thin orchestrator that imports from that folder.
