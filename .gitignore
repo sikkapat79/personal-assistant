@@ -41,3 +41,6 @@ coverage/
 # Local Pax config (defense in depth; normal path is ~/.pa)
 .pa/
 settings.json
+
+# Local-only plans (not pushed; use *.local.md in .cursor/plans/)
+.cursor/plans/*.local.md

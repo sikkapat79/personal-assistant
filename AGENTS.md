@@ -8,6 +8,7 @@ Quick reference for AI agents working on this codebase.
 - **KISS, DRY & SOLID.** Prefer the simplest solution (KISS); avoid duplication (DRY); follow SOLID (e.g. ports in `application/ports/`, composition wires adapters). See `.cursor/rules/design-principles.mdc`.
 - **TypeScript/Bun.** No build step for running; imports are plain TS. Use existing paths (e.g. `../../../../config/...` from nested folders under `src/`).
 - **File size and context proximity.** When a use-case or module grows beyond ~300 lines, extract by cohesive context into a feature subfolder (e.g. `use-cases/agent/`); keep the main file as a thin orchestrator. See `.cursor/rules/file-size-and-context-proximity.mdc`.
+- **Plans and proposals.** Plans in `.cursor/plans/`; use `*.local.md` for local-only (gitignored). For portability, create a GitHub issue (feature-request template). See `.cursor/rules/plans-and-proposals.mdc`.
 
 ## Structure (src/)
 

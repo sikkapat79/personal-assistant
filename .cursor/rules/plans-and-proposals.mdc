@@ -1,0 +1,24 @@
+---
+description: Where to put plans and proposals; local-only vs tracked; use GitHub issues for portability
+globs: "**/.cursor/plans/**/*.md,**/*.md"
+alwaysApply: false
+---
+
+# Plans and proposals (project convention)
+
+Where to keep plans and how to keep some local so they are not pushed to git.
+
+## Rules
+
+- **Plans live in** `.cursor/plans/`. Put any plan or proposal markdown there.
+- **Local-only (not pushed):** Use the suffix `.local.md` in that folder (e.g. `draft.local.md`, `my-notes.local.md`). These are gitignored via `.cursor/plans/*.local.md` in `.gitignore`.
+- **Tracked plans:** Any plan without `.local` in the name (e.g. `proposal-finance-pax.md`, `pax-metadata-storage-layer.md`) can be committed and pushed.
+- **Portability when changing machines:** For proposals you want to keep across machines, create a **GitHub issue** (use the [feature request template](.github/ISSUE_TEMPLATE/feature_request.md)) and optionally link to it from a local or tracked plan. The issue is the source of truth.
+
+## Summary
+
+| Location | Pushed to git? | Use when |
+|----------|----------------|----------|
+| `.cursor/plans/*.local.md` | No | Local drafts, private notes, machine-specific plans |
+| `.cursor/plans/*.md` (no `.local`) | Yes (if you commit them) | Shared plans, proposals you want in the repo |
+| GitHub issue | Yes (lives on GitHub) | Proposals you want to keep when changing machines; use issue template |
