@@ -23,11 +23,11 @@ Quick reference for AI agents working on this codebase.
 | **config/** | Resolved config, profile, settings (e.g. `~/.pa/settings.json`). |
 | **composition/** | Wiring (e.g. `compose()`) for use-cases and adapters. |
 | **design-tokens/** | Shared TUI colours etc. |
-| **agent-context/** | Editable docs and rules for Pax (log/task behaviour). Not code; edit here to change agent behaviour without code changes. |
+| **agent-context/** | Source of truth for **product behaviour** (logs, tasks). **For coding agents** (e.g. Cursor): land here to understand how Pax should behave; edit here to change behaviour without code changes. Loaded by the app into the runtime agent's prompt. **Not** for defining runtime agents or teammates—those live in application code. |
 
 ## Behaviour and data rules
 
-Log and task behaviour (update modes, preserve data, summarize checklist) is defined in **agent-context/**: see `agent-context/README.md`, `agent-context/rules/data.md`, and `agent-context/docs/journal-and-tasks.md`. Update those files to change how the agent updates logs and tasks.
+**agent-context/** is the source of truth for log and task behaviour. It is **for coding agents** (the AI helping you develop this repo): read `agent-context/README.md`, `agent-context/rules/data.md`, and `agent-context/docs/journal-and-tasks.md` to understand how the app should behave. The app loads these files into the runtime agent's system prompt. Edit them to change behaviour without code changes. **Do not** put runtime-agent concerns here (e.g. teammate descriptions, orchestrator routing)—those belong in application code that builds the prompt.
 
 ## Agent chat and session history
 
