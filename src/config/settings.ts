@@ -48,7 +48,8 @@ export function loadSettings(): Settings {
   try {
     const raw = readFileSync(path, 'utf-8');
     return (JSON.parse(raw) as Settings) || {};
-  } catch {
+  } catch (e) {
+    console.warn('Could not load settings:', path, e instanceof Error ? e.message : String(e));
     return {};
   }
 }

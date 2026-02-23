@@ -17,7 +17,8 @@
     "test": "bun run typecheck && bun run test:tui-scroll",
     "test:tui-scroll": "bun tests/tui-activity-scroll.test.mjs",
     "test:notion-mapping": "bun tests/notion-mapping.test.ts",
-    "test:notion-fetch": "bun tests/notion-fetch.test.ts"
+    "test:notion-fetch": "bun tests/notion-fetch.test.ts",
+    "test:todo-due-date": "bun tests/todo-due-date.test.ts"
   },
   "engines": {
     "bun": ">=1.0.0"
@@ -33,6 +34,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "dayjs": "^1.11.13",
     "@notionhq/client": "^2.2.15",
     "@opentui/core": "^0.1.81",
     "@opentui/react": "^0.1.81",

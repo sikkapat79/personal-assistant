@@ -37,3 +37,7 @@ coverage/
 
 # Optional local config (e.g. local notion/test overrides)
 *.local.*
+
+# Local Pax config (defense in depth; normal path is ~/.pa)
+.pa/
+settings.json

@@ -9,6 +9,7 @@ import { TODO_PRIORITIES } from '../../domain/entities/todo';
 import type { LogInputDto } from '../dto/log-dto';
 import { AGENT_TOOLS } from '../dto/agent-tools';
 import { AGENT_NAME } from '../../config/branding';
+import { todayLogDate } from '../../domain/value-objects/log-date';
 import { LogUseCase } from './log-use-case';
 import { TodosUseCase } from './todos-use-case';
 
@@ -154,7 +155,7 @@ export class AgentUseCase {
   }
 
   async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
-    const todayDate = new Date().toISOString().slice(0, 10);
+    const todayDate = todayLogDate();
     const [ctx, todayLog, openTodos] = await Promise.all([
       this.context.getContext(),
       this.logs.findByDate(todayDate),

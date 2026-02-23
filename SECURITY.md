@@ -23,3 +23,7 @@ We do not have a bug bounty program; we appreciate responsible disclosure and wi
 
 - **Pax** stores Notion and optional OpenAI API keys in `~/.pa/settings.json` or environment variables. These are never logged or sent anywhere except to Notion/OpenAI APIs.
 - Do not commit `.env`, `~/.pa/settings.json`, or any file containing API keys or tokens. The repository should not contain real credentials.
+
+## HTTP UI (bun run ui)
+
+The optional HTTP UI is intended for **localhost only**. It has no authentication. Do not expose it to the network (e.g. by binding to 0.0.0.0 or via port forwarding) without adding authentication.

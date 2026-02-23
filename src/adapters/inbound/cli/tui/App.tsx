@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useLayoutEffect } from
 import { TextAttributes } from '@opentui/core';
 import { useKeyboard, useRenderer, useAppContext } from '@opentui/react';
 import type { DailyLog } from '../../../../domain/entities/daily-log';
+import { todayLogDate } from '../../../../domain/value-objects/log-date';
 import { getResolvedConfig, hasRequiredConfig } from '../../../../config/resolved';
 import { saveProfile } from '../../../../config/profile';
 import { loadSettings, saveSettings } from '../../../../config/settings';
@@ -102,7 +103,7 @@ export function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
 
   useEffect(() => {
     if (error || !logs || !todos) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLogDate();
     let cancelled = false;
     setTodayLogLoadError(null);
     (async () => {
@@ -160,7 +161,7 @@ export function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
       setLastReply(reply);
       setRecent((r) => ['Agent: ' + (reply.length > 60 ? reply.slice(0, 60) + '…' : reply), ...r].slice(0, 8));
       if (logs) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayLogDate();
         try {
           const log = await logs.findByDate(today);
           setTodayLog(log ?? null);
