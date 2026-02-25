@@ -1,6 +1,8 @@
 /**
  * Notion column schema: purpose and types for Logs and TODOs databases.
  * Every field is meaningful; the agent and app use partial updates (merge with existing) so other fields are preserved.
+ * Each column has exactly one purpose (what this column stores); column purpose is not the same as database purpose (what the DB is for).
+ * Purpose is for both humans (docs, TUI) and for Pax (agent context, system prompts, tools) now and in the near future.
  *
  * --- TODOs ---
  * | Column     | Notion type | Purpose                                      |
@@ -10,16 +12,16 @@
  * | Due Date   | Date       | When the task is due                          |
  * | Notes      | Text       | Free-form notes                               |
  * | Priority   | Select     | High | Medium | Low                  |
- * | Done       | Checkbox or Status (select) | Completion flag; Status is auto-detected if used |
+ * | Done       | Checkbox or Status (select) | Current task state (Todo | In Progress | Done); checkbox or Status in Notion |
  *
  * --- Logs ---
  * | Column         | Notion type | Purpose                                      |
  * |----------------|------------|----------------------------------------------|
- * | Title          | Text (title)| Log title                                    |
+ * | Title          | Text (title)| Title of the journal log for that specific day |
  * | Date           | Date       | Log date                                     |
  * | Score          | Number     | User rates the day                            |
  * | Mood           | Number     | 1–5 (emoji-based)                             |
- * | Energy         | Number     | 1–10 = energy budget for that day; yesterday’s overview is one input |
+ * | Energy         | Number     | 1–100 = energy budget for that day; yesterday’s overview is one input |
  * | Deep Work Hours| Number     | Hours in deep work                            |
  * | Workout        | Checkbox   | Did user workout?                             |
  * | Diet           | Checkbox   | Diet checkbox (user describes when to check)  |
@@ -40,14 +42,14 @@ export const NOTION_SCHEMA_PURPOSE = {
     dueDate: 'When the task is due',
     notes: 'Free-form notes',
     priority: 'High | Medium | Low',
-    done: 'Completion flag',
+    done: 'Current state of the task (Todo, In Progress, Done)',
   },
   logs: {
-    title: 'Log title',
+    title: 'Title of the journal log for that specific day',
     date: 'Log date',
     score: 'User rates the day',
     mood: '1–5 emoji-based',
-    energy: '1–10 energy budget for day; yesterday overview is one input',
+    energy: '1–100 energy budget for day; yesterday overview is one input',
     deepWorkHours: 'Hours in deep work',
     workout: 'Did user workout?',
     diet: 'Diet checkbox',
@@ -62,7 +64,7 @@ export const NOTION_SCHEMA_PURPOSE = {
 type LogsPurposeKey = keyof (typeof NOTION_SCHEMA_PURPOSE)['logs'];
 type TodosPurposeKey = keyof (typeof NOTION_SCHEMA_PURPOSE)['todos'];
 
-/** Type-safe lookup for column purpose by entity and ourKey. Used by TUI setup and can guide agent/docs. */
+/** Type-safe lookup for column purpose by entity and ourKey. Used by TUI setup, cached schema, and Pax (agent context, prompts, tools). */
 export function getColumnPurpose(
   entity: 'logs' | 'todos',
   ourKey: string

@@ -19,7 +19,8 @@ function handleError(err: unknown, res: express.Response): void {
 
 app.get('/today', async (_req, res) => {
   try {
-    const { logs, todosUseCase } = compose();
+    const composition = await compose();
+    const { logs, todosUseCase } = composition;
     const today = todayLogDate();
     const [log, todos] = await Promise.all([
       logs.findByDate(today),
@@ -45,7 +46,8 @@ app.post('/log', async (req, res) => {
       dateRaw != null ? String(dateRaw) : todayLogDate();
     const title = titleRaw != null ? String(titleRaw) : '';
     const notes = notesRaw != null ? String(notesRaw) : '';
-    const { logUseCase } = compose();
+    const composition = await compose();
+    const { logUseCase } = composition;
     const result = await logUseCase.upsert({ date, title, notes });
     res.json({ created: result.created, date: result.date });
   } catch (err) {
@@ -55,7 +57,8 @@ app.post('/log', async (req, res) => {
 
 app.get('/todos', async (_req, res) => {
   try {
-    const { todosUseCase } = compose();
+    const composition = await compose();
+    const { todosUseCase } = composition;
     const list = await todosUseCase.listOpen();
     res.json(list);
   } catch (err) {

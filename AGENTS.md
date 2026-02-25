@@ -29,6 +29,8 @@ Quick reference for AI agents working on this codebase.
 
 **agent-context/** is the source of truth for log and task behaviour. It is **for coding agents** (the AI helping you develop this repo): read `agent-context/README.md`, `agent-context/rules/data.md`, and `agent-context/docs/journal-and-tasks.md` to understand how the app should behave. The app loads these files into the runtime agent's system prompt. Edit them to change behaviour without code changes. **Do not** put runtime-agent concerns here (e.g. teammate descriptions, orchestrator routing)—those belong in application code that builds the prompt.
 
+**Notion metadata: database and column purpose.** Each Notion column has exactly one purpose (what that column stores). Database purpose (what the DB is for, e.g. "Tasks", "Daily journal") is separate and stored in scope; column purpose lives in `src/adapters/outbound/notion/notion-schema.ts` and is used for humans (docs, TUI) and for Pax (agent context, prompts, tools).
+
 ## Agent chat and session history
 
 Long chat history is handled in **application/use-cases/agent-use-case.ts**: only the last `MAX_RECENT_MESSAGES` (16) messages are sent to the LLM in full; older turns are summarized into a single "Earlier in this session" summary. To avoid re-summarizing on every turn, the use-case uses **incremental caching** on the instance: `lastSummarizedIndex` (length of the prefix already summarized) and `cachedSessionSummary`. When the old-part length has not increased, the cached summary is returned; when it has, only the new slice is summarized and merged with the cache. Cache is invalidated when history is short or shrinks (e.g. after `/clear`). See `buildEffectiveHistory`, `summarizeConversation`, and the cache fields in that file.

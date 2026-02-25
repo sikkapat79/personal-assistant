@@ -81,11 +81,56 @@ export function getNotionClient(apiKey: string): Client {
   return sharedClient;
 }
 
+/** Create a "Pax Metadata" database under the given page. Returns the new database ID. */
+export async function createMetadataDatabaseUnderPage(
+  apiKey: string,
+  parentPageId: string
+): Promise<string> {
+  const client = getNotionClient(apiKey);
+  const db = await client.databases.create({
+    parent: { type: 'page_id', page_id: parentPageId },
+    title: [{ type: 'text', text: { content: 'Pax Metadata' } }],
+    description: [
+      {
+        type: 'text',
+        text: {
+          content:
+            'Pax app metadata: allowed Notion scope (DB IDs + column mapping), cached schema summaries, provenance, and sync state. One row per key; Data holds JSON. ⚠ Caution: Do not edit rows or the Data column manually—this can break Pax. Use Pax settings or the app to change scope or schema.',
+        },
+      },
+    ],
+    properties: {
+      Type: {
+        select: {
+          options: [
+            { name: 'scope' },
+            { name: 'provenance' },
+            { name: 'schema' },
+            { name: 'sync' },
+          ],
+        },
+        description: 'Kind of metadata: scope (DBs + columns), provenance, schema (cached summaries), or sync state.',
+      },
+      Key: {
+        title: {},
+        description: 'Unique key for this row (e.g. allowed_scope, schema_logs, schema_todos). Used to look up the row.',
+      },
+      Data: {
+        rich_text: {},
+        description: 'JSON value for this key. Parsed by Pax; do not change structure.',
+      },
+    },
+  });
+  return db.id;
+}
+
 /** Flat settings shape (env or file). Used by config layer. */
 export interface NotionSettingsShape {
   NOTION_API_KEY?: string;
   NOTION_LOGS_DATABASE_ID?: string;
   NOTION_TODOS_DATABASE_ID?: string;
+  NOTION_PAGES_PARENT_ID?: string;
+  NOTION_METADATA_DATABASE_ID?: string;
   NOTION_LOGS_TITLE?: string;
   NOTION_LOGS_DATE?: string;
   NOTION_LOGS_SCORE?: string;
@@ -160,6 +205,52 @@ function buildNotionConfigFrom(s: NotionSettingsShape): NotionConfig {
       todos: { databaseId: todosDatabaseId, columns: todosColumns, doneKind },
     },
   };
+}
+
+/** Build scope + column mapping from settings (no API key). Returns null if DB IDs missing. Used by metadata bootstrap. */
+export function buildNotionScopeFromSettings(s: NotionSettingsShape): {
+  logsDatabaseId: string;
+  todosDatabaseId: string;
+  logsColumns: LogsColumns;
+  todosColumns: TodosColumns;
+  doneKind: TodosDoneKind;
+} | null {
+  const logsDatabaseId = s.NOTION_LOGS_DATABASE_ID;
+  const todosDatabaseId = s.NOTION_TODOS_DATABASE_ID;
+  if (!logsDatabaseId || !todosDatabaseId) return null;
+  const logsColumns: LogsColumns = {
+    title: s.NOTION_LOGS_TITLE ?? DEFAULT_LOGS_COLUMNS.title,
+    date: s.NOTION_LOGS_DATE ?? DEFAULT_LOGS_COLUMNS.date,
+    score: s.NOTION_LOGS_SCORE ?? DEFAULT_LOGS_COLUMNS.score,
+    mood: s.NOTION_LOGS_MOOD ?? DEFAULT_LOGS_COLUMNS.mood,
+    energy: s.NOTION_LOGS_ENERGY ?? DEFAULT_LOGS_COLUMNS.energy,
+    deepWorkHours: s.NOTION_LOGS_DEEP_WORK_HOURS ?? DEFAULT_LOGS_COLUMNS.deepWorkHours,
+    workout: s.NOTION_LOGS_WORKOUT ?? DEFAULT_LOGS_COLUMNS.workout,
+    diet: s.NOTION_LOGS_DIET ?? DEFAULT_LOGS_COLUMNS.diet,
+    readingMins: s.NOTION_LOGS_READING_MINS ?? DEFAULT_LOGS_COLUMNS.readingMins,
+    wentWell: s.NOTION_LOGS_WENT_WELL ?? DEFAULT_LOGS_COLUMNS.wentWell,
+    improve: s.NOTION_LOGS_IMPROVE ?? DEFAULT_LOGS_COLUMNS.improve,
+    gratitude: s.NOTION_LOGS_GRATITUDE ?? DEFAULT_LOGS_COLUMNS.gratitude,
+    tomorrow: s.NOTION_LOGS_TOMORROW ?? DEFAULT_LOGS_COLUMNS.tomorrow,
+  };
+  const doneValue = s.NOTION_TODOS_DONE_VALUE;
+  const useStatus = doneValue != null && doneValue !== '';
+  const defaultDoneColumn = useStatus ? 'Status' : DEFAULT_TODOS_COLUMNS.done;
+  const defaultOpenValue = useStatus ? 'Todo' : 'OPEN';
+  const todosColumns: TodosColumns = {
+    title: s.NOTION_TODOS_TITLE ?? DEFAULT_TODOS_COLUMNS.title,
+    category: s.NOTION_TODOS_CATEGORY ?? DEFAULT_TODOS_COLUMNS.category,
+    dueDate: s.NOTION_TODOS_DUE_DATE ?? DEFAULT_TODOS_COLUMNS.dueDate,
+    notes: s.NOTION_TODOS_NOTES ?? DEFAULT_TODOS_COLUMNS.notes,
+    priority: s.NOTION_TODOS_PRIORITY ?? DEFAULT_TODOS_COLUMNS.priority,
+    done: s.NOTION_TODOS_STATUS ?? defaultDoneColumn,
+  };
+  const openValue = s.NOTION_TODOS_OPEN_VALUE ?? defaultOpenValue;
+  const inProgressValue = s.NOTION_TODOS_IN_PROGRESS_VALUE;
+  const doneKind: TodosDoneKind = useStatus
+    ? { type: 'status', doneValue: doneValue!, openValue, inProgressValue }
+    : { type: 'checkbox' };
+  return { logsDatabaseId, todosDatabaseId, logsColumns, todosColumns, doneKind };
 }
 
 /** Build NotionConfig from resolved settings (config layer). */

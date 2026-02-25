@@ -29,6 +29,10 @@ export function SettingsPageContent({
         <text fg={designTokens.color.muted}>Notion API key: {maskSecret(s.NOTION_API_KEY)}</text>
         <text fg={designTokens.color.muted}>Logs DB ID: {s.NOTION_LOGS_DATABASE_ID || 'Not set'}</text>
         <text fg={designTokens.color.muted}>TODOs DB ID: {s.NOTION_TODOS_DATABASE_ID || 'Not set'}</text>
+        <text fg={designTokens.color.muted}>Parent page ID: {s.NOTION_PAGES_PARENT_ID || 'Not set'}</text>
+        {s.NOTION_PAGES_PARENT_ID ? (
+          <text fg={designTokens.color.muted}>Caution: If Pax creates a "Pax Metadata" database under this page, do not edit it manually—use Pax to change settings.</text>
+        ) : null}
         <text fg={designTokens.color.muted}>OpenAI API key: {maskSecret(s.OPENAI_API_KEY)}</text>
         <text fg={designTokens.color.muted}>OpenAI model: {s.OPENAI_MODEL ?? 'gpt-4o-mini'}</text>
       </box>

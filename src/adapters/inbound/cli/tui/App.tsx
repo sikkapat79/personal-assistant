@@ -428,7 +428,7 @@ export function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
                   <text fg={designTokens.color.muted}>Your energy </text>
                   <text fg={designTokens.color.accent}>{energyBarSegments(todayLog.content.energy).filled}</text>
                   <text fg={designTokens.color.muted}>{energyBarSegments(todayLog.content.energy).empty}</text>
-                  <text fg={designTokens.color.muted}> {todayLog.content.energy}/10</text>
+                  <text fg={designTokens.color.muted}> {todayLog.content.energy}/100</text>
                 </box>
               )}
             </box>

@@ -42,7 +42,8 @@ export async function runInteractive(): Promise<void> {
 }
 
 async function runChoice(choice: Choice): Promise<void> {
-  const { logUseCase, todosUseCase, logs } = compose();
+  const composition = await compose();
+  const { logUseCase, todosUseCase, logs } = composition;
   const today = todayLogDate();
 
   switch (choice) {
@@ -99,7 +100,7 @@ async function runChoice(choice: Choice): Promise<void> {
       break;
     }
     case 'agent': {
-      const { agentUseCase } = compose();
+      const { agentUseCase } = composition;
       const { default: prompts } = await import('prompts');
       say(`${AGENT_NAME} (type "exit" to return to menu)\n`);
       const history: { role: 'user' | 'assistant'; content: string }[] = [];

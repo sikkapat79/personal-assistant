@@ -1,6 +1,7 @@
 import type { ILogsRepository } from '../ports/logs-repository';
 import type { ITodosRepository } from '../ports/todos-repository';
 import type { IAgentContextPort } from '../ports/agent-context-port';
+import type { IMetadataStore } from '../ports/metadata-store';
 import type { ILLMPort, ChatMessage } from '../ports/llm-port';
 import type { TodoPriority, TodoCategory, TodoStatus } from '../../domain/entities/todo';
 import type { DailyLog } from '../../domain/entities/daily-log';
@@ -61,7 +62,7 @@ function parseSingleFieldValue(
     case 'mood':
       return !Number.isNaN(num) && num >= 1 && num <= 5 ? { mood: Math.round(num) } : undefined;
     case 'energy':
-      return !Number.isNaN(num) && num >= 1 && num <= 10 ? { energy: Math.round(num) } : undefined;
+      return !Number.isNaN(num) && num >= 1 && num <= 100 ? { energy: Math.round(num) } : undefined;
     case 'score':
       return !Number.isNaN(num) && num >= 1 && num <= 10 ? { score: Math.round(num) } : undefined;
     case 'deep_work_hours':
@@ -82,7 +83,8 @@ export class AgentUseCase {
     private readonly logs: ILogsRepository,
     private readonly todos: ITodosRepository,
     private readonly context: IAgentContextPort,
-    private readonly llm: ILLMPort
+    private readonly llm: ILLMPort,
+    private readonly metadataStore: IMetadataStore
   ) {}
 
   /** Reply that looks like raw tool-call output should never be shown to the user. */
@@ -156,13 +158,14 @@ export class AgentUseCase {
 
   async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
     const todayDate = todayLogDate();
-    const [ctx, todayLog, openTodos] = await Promise.all([
+    const [ctx, todayLog, openTodos, schemaSummary] = await Promise.all([
       this.context.getContext(),
       this.logs.findByDate(todayDate),
       this.todos.listOpen(),
+      buildSchemaSummary(this.metadataStore),
     ]);
     const currentState = buildCurrentStateSnapshot(todayDate, todayLog, openTodos);
-    const systemPrompt = buildSystemPrompt(ctx, todayDate, currentState);
+    const systemPrompt = buildSystemPrompt(ctx, todayDate, currentState, schemaSummary);
     const { effectiveHistory, sessionSummary } = await this.buildEffectiveHistory(history);
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -473,6 +476,13 @@ export class AgentUseCase {
         await todosUseCase.completeByIdOrIndex(idOrIndex);
         return 'Marked that task as done.';
       }
+      case 'get_schema': {
+        const databaseId = String(args.database_id ?? '');
+        const schema = await this.metadataStore.getCachedSchema(databaseId);
+        if (!schema) return `No cached schema for database ${databaseId}.`;
+        const lines = schema.properties.map((p) => `- ${p.name} (${p.notionType})`);
+        return `Properties for ${databaseId}:\n${lines.join('\n')}`;
+      }
       default:
         return "That tool isn't available.";
     }
@@ -488,7 +498,7 @@ function buildCurrentStateSnapshot(todayDate: string, todayLog: DailyLog | null,
     const parts = ["Today's log: exists."];
     if (c.title) parts.push(`Title: "${c.title}"`);
     if (c.mood != null) parts.push(`mood ${c.mood}/5`);
-    if (c.energy != null) parts.push(`energy ${c.energy}/10`);
+    if (c.energy != null) parts.push(`energy ${c.energy}/100`);
     if (c.score != null) parts.push(`score ${c.score}/10`);
     lines.push(parts.join('. '));
   }
@@ -501,10 +511,35 @@ function buildCurrentStateSnapshot(todayDate: string, todayLog: DailyLog | null,
   return lines.join('\n');
 }
 
+/** Build a compact "Databases and properties" summary from metadata store for the system prompt. Includes column purpose so Pax knows what each field is for. */
+async function buildSchemaSummary(store: IMetadataStore): Promise<string | null> {
+  const scope = store.getAllowedNotionScope();
+  if (!scope) return null;
+  const dbIds: { id: string; label: string }[] = [];
+  if (scope.logsDatabaseId) dbIds.push({ id: scope.logsDatabaseId, label: scope.logsPurpose ?? 'Logs' });
+  if (scope.todosDatabaseId) dbIds.push({ id: scope.todosDatabaseId, label: scope.todosPurpose ?? 'Todos' });
+  if (scope.extraDatabaseIds?.length) {
+    scope.extraDatabaseIds.forEach((id) => dbIds.push({ id, label: id }));
+  }
+  if (dbIds.length === 0) return null;
+  const parts: string[] = [];
+  for (const { id, label } of dbIds) {
+    const schema = await store.getCachedSchema(id);
+    if (schema?.properties?.length) {
+      const props = schema.properties
+        .map((p) => (p.purpose ? `${p.name} (${p.purpose})` : p.name))
+        .join(', ');
+      parts.push(`${label}: ${props}`);
+    }
+  }
+  return parts.length > 0 ? parts.join('; ') : null;
+}
+
 function buildSystemPrompt(
   ctx: { rules: string; docs: string[]; skills: string[] },
   todayDate: string,
-  currentState: string
+  currentState: string,
+  schemaSummary?: string | null
 ): string {
   const parts = [
     '## Persona',
@@ -516,6 +551,11 @@ function buildSystemPrompt(
     '## Current state (use this to reason; call tools when you need to read or change data)',
     currentState,
     '',
+  ];
+  if (schemaSummary) {
+    parts.push('## Databases and properties', schemaSummary, '');
+  }
+  parts.push(
     '## Data',
     'Every field in their logs and tasks is meaningful to them. Preserve existing data: only update the specific field(s) the user mentioned or provided; never clear or overwrite other fields. When summarizing or referring to their day, do not drop or ignore any field they care about (sleep, mood, score, workout, hours, tasks done/undone, etc.). For how to update logs without bugs (single-field vs summarize, which fields to send), follow the **Rules** and **Docs** below—they are the source of truth.',
     '',
@@ -528,17 +568,17 @@ function buildSystemPrompt(
     '6. **New day** – When they open the app or start chatting and there is no log for today, you can offer a brief line (e.g. today\'s focus or one-line yesterday) and help them get oriented; if no log for today, ask for a **daily check-in** (see 7).',
     '7. **No log for today** – If get_logs shows no log for today, ask the user for a **daily check-in** (sleep and mood). Do not ask for energy; derive it and call apply_log_update with mode create. Do **not** append a check-in question to every reply—only when there is no log for today or they ask to create today\'s log. When you call create, follow the **Daily check-in / create** rules below (use only what they said; no inventing).',
     '8. **Single-field and tasks** – When the user mentions only one log thing (e.g. "I did a workout", "worked 5 hours"), use apply_log_update with mode single_field and that field + value. Same for tasks: when they ask to change a task\'s priority, due date, title, category, notes, or status (Todo / In Progress / Done), call **update_todo** with id_or_index (e.g. "1" for first task) and only that field (e.g. priority: "High", or status: "In Progress" for "start task 1"). Do not only list tasks—call update_todo to apply the change.',
-    '9. **Energy budget** – The energy field is the **energy budget for that day** (1–10). Do **not** ask the user for it. It comes from **daily check-in**: derive from sleep (notes), mood, and optionally yesterday\'s overview (get_logs for yesterday). When updating energy later, use yesterday\'s overview as one input.',
+    '9. **Energy budget** – The energy field is the **energy budget for that day** (1–100). Do **not** ask the user for it. It comes from **daily check-in**: derive from sleep (notes), mood, and optionally yesterday\'s overview (get_logs for yesterday). When updating energy later, use yesterday\'s overview as one input.',
     '',
     '## Daily check-in / create (no hallucination)',
-    'When calling apply_log_update with mode create (e.g. after step 7 above), use **only what the user said**. (1) **sleep_notes**: User\'s exact words or a short paraphrase; do not add details, times, or interpretations they did not say. (2) **energy**: Derive only from the sleep and mood they gave (e.g. good sleep + good mood → 6–8, poor sleep + low mood → 2–4); if you have no yesterday log, use only sleep + mood; do not invent context. (3) **title** (optional): Base only on sleep and mood they actually stated; do not add phrases they did not imply.',
+    'When calling apply_log_update with mode create (e.g. after step 7 above), use **only what the user said**. (1) **sleep_notes**: User\'s exact words or a short paraphrase; do not add details, times, or interpretations they did not say. (2) **energy**: Derive only from the sleep and mood they gave (e.g. good sleep + good mood → 60–80, poor sleep + low mood → 20–40); if you have no yesterday log, use only sleep + mood; do not invent context. (3) **title** (optional): Base only on sleep and mood they actually stated; do not add phrases they did not imply.',
     '',
     '## Responding',
     'Be friendly and conversational. Reply in full sentences, in your own words—as if you’re chatting, not filing a report. Match their tone and energy. After using tools, say something that fits the moment (e.g. a short acknowledgment, a follow-up question, or a light comment) instead of robotic confirmations or raw output. Only call tools when their intent is clear; when you change something (e.g. add a task, update the journal), mention it naturally in the flow of the reply.',
     '',
     '## Rules',
     ctx.rules,
-  ];
+  );
   if (ctx.skills.length) parts.push('\n## Skills\n' + ctx.skills.join('\n'));
   if (ctx.docs.length) parts.push('\n## Docs (reference)\n' + ctx.docs.slice(0, 3).join('\n'));
   return parts.join('\n');

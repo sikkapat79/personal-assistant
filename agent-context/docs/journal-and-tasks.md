@@ -7,7 +7,7 @@
 ## Create first and required fields when creating
 
 - **Create first:** Before any single-field update or summarize for a date, ensure a log exists. If `get_logs` shows no log, use Mode 0 (create) with sleeping record, mood, and energy. Only then use single_field or summarize.
-- **Required when creating a new log:** (1) **sleeping record** (notes / sleep_notes), (2) **waking-up mood** (mood 1–5), (3) **energy budget** (energy 1–10). Ask the user only for sleep and mood. **Energy is not asked from the user**—derive it from daily check-in (sleep, mood, and optionally yesterday's overview via `get_logs`).
+- **Required when creating a new log:** (1) **sleeping record** (notes / sleep_notes), (2) **waking-up mood** (mood 1–5), (3) **energy budget** (energy 1–100). Ask the user only for sleep and mood. **Energy is not asked from the user**—derive it from daily check-in (sleep, mood, and optionally yesterday's overview via `get_logs`).
 
 ---
 
@@ -22,7 +22,7 @@ Field names and purposes here match the app's column mapping (see `notion-schema
 | notes          | Free-form notes; use for sleeping record on create. |
 | score          | 1–10 for that day (e.g. when summarizing). |
 | mood           | 1–5 (e.g. after waking). |
-| energy         | Energy budget for that day (1–10). Use yesterday's overview as one input. |
+| energy         | Energy budget for that day (1–100). Use yesterday's overview as one input. |
 | deep_work_hours| Hours in deep work. |
 | workout        | Did user workout? (boolean). |
 | diet           | Diet checkbox (boolean). |
@@ -49,7 +49,7 @@ When opening the app (TUI or today view), load only that specific date's log (to
 
 If there is no log entry for today, ask the user for a **daily check-in** (sleep and mood). Do not ask for energy; derive it and create the log (Mode 0). Do not append a check-in question to every reply—only when there is no log for today or they ask to create or open today's log.
 
-**Do not hallucinate on create.** Use only what the user said: (1) **sleep_notes** = their exact words or a short paraphrase; do not add times, details, or interpretations they did not say. (2) **energy** = derive only from the sleep and mood they gave (e.g. good sleep + good mood → 6–8); if you did not fetch yesterday's log, use only sleep + mood. (3) **title** = base only on sleep and mood they stated; do not add phrases they did not imply.
+**Do not hallucinate on create.** Use only what the user said: (1) **sleep_notes** = their exact words or a short paraphrase; do not add times, details, or interpretations they did not say. (2) **energy** = derive only from the sleep and mood they gave (e.g. good sleep + good mood → 60–80); if you did not fetch yesterday's log, use only sleep + mood. (3) **title** = base only on sleep and mood they stated; do not add phrases they did not imply.
 
 ---
 
@@ -70,10 +70,10 @@ Then follow **Mode 2** in `rules/data.md`: call `apply_log_update` with `mode: "
 
 ## Energy budget
 
-**energy** = energy budget for that day (1–10). It is **not** asked from the user; it comes from **daily check-in**: derive from sleep (notes), waking mood, and optionally yesterday's overview (`get_logs` for yesterday—score, deep work hours, workout). When updating energy later, use yesterday's overview as one input.
+**energy** = energy budget for that day (1–100). It is **not** asked from the user; it comes from **daily check-in**: derive from sleep (notes), waking mood, and optionally yesterday's overview (`get_logs` for yesterday—score, deep work hours, workout). When updating energy later, use yesterday's overview as one input.
 
 ---
 
 ## Tasks
 
-`update_todo`: only include the fields to change (title, category, due_date, notes, priority). Never overwrite unspecified fields.
+Each task has a **status** (Todo, In Progress, Done)—the current state of that task. Use `update_todo` to change status (e.g. "start task 1" → status In Progress). Only include the fields to change (title, category, due_date, notes, priority, status). Never overwrite unspecified fields.
