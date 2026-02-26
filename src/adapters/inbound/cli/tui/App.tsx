@@ -1,523 +1,459 @@
-import React, { useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TextAttributes } from '@opentui/core';
-import { useKeyboard, useRenderer, useAppContext } from '@opentui/react';
-import type { DailyLog } from '../../../../domain/entities/daily-log';
-import { todayLogDate } from '../../../../domain/value-objects/log-date';
-import { getResolvedConfig, hasRequiredConfig } from '../../../../config/resolved';
-import { saveProfile } from '../../../../config/profile';
-import { loadSettings, saveSettings } from '../../../../config/settings';
-import {
-  fetchDatabasePropertyNames,
-  suggestColumnMapping,
-} from '../../../../adapters/outbound/notion/client';
-import { AGENT_NAME, AGENT_TAGLINE } from '../../../../config/branding';
+import { useKeyboard, useRenderer } from '@opentui/react';
 import { designTokens } from '../../../../design-tokens';
-import { SETUP_STEPS } from './constants/setup';
-import { TIPS } from './constants/tips';
-import { ACTIVITY_VISIBLE_LINES, LAST_RESPONSE_LINES, FAKE_ENV_HINT } from './constants/layout';
-import { energyBarSegments } from './energyBarSegments';
-import { getPaxMood } from './getPaxMood';
-import { clearConsole } from './clearConsole';
-import { normalizeError } from './normalizeError';
-import { formatTodayLoadError } from './formatTodayLoadError';
-import { typeableChar } from './typeableChar';
+import { getResolvedConfig, hasRequiredConfig } from '../../../../config/resolved';
 import { useAgent } from './useAgent';
 import { useSpinner } from './useSpinner';
-import { usePaxAnimationFrame } from './usePaxAnimationFrame';
-import type { Page, ColumnSuggestionRow } from './types';
-import { FirstRunSetupContent } from './FirstRunSetupContent';
-import { ColumnScanningContent } from './ColumnScanningContent';
-import { ColumnMappingContent } from './ColumnMappingContent';
-import { SettingsPageContent } from './SettingsPageContent';
+import { truncateText, calculateChatLineCount } from './wrapText';
+import { clearConsole } from './clearConsole';
+import { todayLogDate, createLogDate } from '../../../../domain/value-objects/log-date';
+import type { DailyLog } from '../../../../domain/entities/daily-log';
+import type { TodoItemDto } from '../../../../application/dto/todo-dto';
+import { TodayLogSection } from './TodayLogSection';
+import { TasksSection } from './TasksSection';
+import { ChatSection } from './ChatSection';
+import { InputSection } from './InputSection';
+import { TopbarSection } from './TopbarSection';
 
-export function App({ onConfigSaved }: { onConfigSaved?: () => void }) {
+/**
+ * Pax TUI - Clean implementation with proper overflow handling
+ */
+export function App() {
   const renderer = useRenderer();
-  const [page, setPage] = useState<Page>(() => (hasRequiredConfig() ? 'main' : 'settings'));
-  const [setupStep, setSetupStep] = useState<number | null>(() => (hasRequiredConfig() ? null : 0));
-  const [setupPhase, setSetupPhase] = useState<'scanning' | 'mapping' | null>(null);
-  const [columnSuggestions, setColumnSuggestions] = useState<ColumnSuggestionRow[] | null>(null);
-  const [mappingStep, setMappingStep] = useState(0);
-  const [mappingOverride, setMappingOverride] = useState('');
-  const [confirmedColumnValues, setConfirmedColumnValues] = useState<Record<number, string>>({});
-  const [columnScanError, setColumnScanError] = useState<string | null>(null);
-  const [setupInput, setSetupInput] = useState('');
-  const [settingsDisplayNameInput, setSettingsDisplayNameInput] = useState('');
+  const resolved = getResolvedConfig();
+  const { agent, logs, todos, error } = useAgent();
+
+  // Terminal dimensions
+  const [terminalSize, setTerminalSize] = useState({
+    width: process.stdout.columns || 80,
+    height: process.stdout.rows || 24,
+  });
+
+  // App state
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const [recent, setRecent] = useState<string[]>([]);
-  const [lastReply, setLastReply] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activityScroll, setActivityScroll] = useState(0);
-  const [showHelp, setShowHelp] = useState(false);
   const [history, setHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
-  const [todayLog, setTodayLog] = useState<DailyLog | null | 'loading'>('loading');
-  const [todayLogLoadError, setTodayLogLoadError] = useState<string | null>(null);
-  const recentCountRef = useRef(0);
-  const resolved = getResolvedConfig();
-  const { agent, logs, todos, logUseCase, error } = useAgent();
-  recentCountRef.current = recent.length;
+  const [todayLog, setTodayLog] = useState<DailyLog | null>(null);
+  const [loadingLog, setLoadingLog] = useState(true);
+  const [tasks, setTasks] = useState<TodoItemDto[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+  const [focusedSection, setFocusedSection] = useState<'log' | 'tasks' | 'chat'>('chat');
+  const [logScrollOffset, setLogScrollOffset] = useState(0);
+  const [tasksScrollOffset, setTasksScrollOffset] = useState(0);
+  const [chatScrollOffset, setChatScrollOffset] = useState(0);
 
-  const spinLoading = useSpinner(todayLog === 'loading');
   const spinThinking = useSpinner(thinking);
-  const spinScan = useSpinner(setupPhase === 'scanning');
-  const paxMood = getPaxMood(thinking, todayLog, todayLogLoadError, errorMessage, lastReply);
-  const paxFrame = usePaxAnimationFrame(paxMood);
 
+  // Calculate max scroll offsets to prevent over-scrolling
+  const getMaxLogScroll = useCallback(() => {
+    if (!todayLog) return 0;
+    let lineCount = 1; // title
+    if (todayLog.content.mood !== undefined || todayLog.content.energy !== undefined) lineCount++; // metrics
+    if (todayLog.content.notes) lineCount++;
+    if (
+      todayLog.content.workout !== undefined ||
+      todayLog.content.diet !== undefined ||
+      todayLog.content.deepWorkHours !== undefined
+    )
+      lineCount++;
+    if (todayLog.content.gratitude) lineCount++;
+    return Math.max(0, lineCount - 4); // 4 is maxVisibleLines in 2-column mode
+  }, [todayLog]);
+
+  const getMaxTasksScroll = useCallback(() => {
+    const isWideScreen = terminalSize.width >= 100;
+    const maxVisible = isWideScreen ? 8 : 10; // 8 for wide, 10 for small
+    return Math.max(0, tasks.length - maxVisible);
+  }, [tasks, terminalSize.width]);
+
+  const getMaxChatScroll = useCallback(() => {
+    const maxVisible = 15; // Default max visible lines
+    // Estimate content width based on terminal size
+    const isWideScreen = terminalSize.width >= 100;
+    const availableWidth = terminalSize.width - 2;
+    const chatColumnWidth = Math.floor(availableWidth * (isWideScreen ? 0.62 : 0.6));
+    const chatContentWidth = chatColumnWidth - 6;
+    // Calculate total wrapped lines
+    const totalLines = calculateChatLineCount(history, chatContentWidth);
+    return Math.max(0, totalLines - maxVisible);
+  }, [history, terminalSize.width]);
+
+  // Fetch today's log
+  const fetchTodayLog = useCallback(async () => {
+    if (!logs) return;
+    try {
+      setLoadingLog(true);
+      const today = todayLogDate();
+      const log = await logs.findByDate(createLogDate(today));
+      setTodayLog(log);
+    } catch (e) {
+      console.error('Failed to fetch today log:', e);
+    } finally {
+      setLoadingLog(false);
+    }
+  }, [logs]);
+
+  // Fetch log on mount
   useEffect(() => {
-    if (setupPhase !== 'scanning') return;
-    setColumnScanError(null);
-    let cancelled = false;
-    (async () => {
-      try {
-        const s = loadSettings();
-        const apiKey = s.NOTION_API_KEY;
-        const logsId = s.NOTION_LOGS_DATABASE_ID;
-        const todosId = s.NOTION_TODOS_DATABASE_ID;
-        if (!apiKey || !logsId || !todosId) {
-          setColumnScanError('Missing Notion API key or database IDs');
-          setSetupPhase(null);
-          return;
-        }
-        const [logsProps, todosProps] = await Promise.all([
-          fetchDatabasePropertyNames(apiKey, logsId),
-          fetchDatabasePropertyNames(apiKey, todosId),
-        ]);
-        if (cancelled) return;
-        const suggestions = suggestColumnMapping(logsProps, todosProps);
-        setColumnSuggestions(suggestions);
-        setMappingStep(0);
-        setMappingOverride('');
-        setConfirmedColumnValues({});
-        setSetupPhase('mapping');
-      } catch (e) {
-        if (!cancelled) {
-          setColumnScanError(e instanceof Error ? e.message : String(e));
-          setSetupPhase(null);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
+    fetchTodayLog();
+  }, [fetchTodayLog]);
+
+  // Reset log scroll when log changes
+  useEffect(() => {
+    setLogScrollOffset(0);
+  }, [todayLog]);
+
+  // Fetch open tasks
+  const fetchTasks = useCallback(async (showLoading = false) => {
+    if (!todos) return;
+    try {
+      if (showLoading) setLoadingTasks(true);
+      const openTasks = await todos.listOpen();
+      // Filter to show only Todo and In Progress status
+      const activeTasks = openTasks.filter((t) => t.status === 'Todo' || t.status === 'In Progress');
+      setTasks(activeTasks);
+    } catch (e) {
+      console.error('Failed to fetch tasks:', e);
+    } finally {
+      if (showLoading) setLoadingTasks(false);
+    }
+  }, [todos]);
+
+  // Fetch tasks on mount
+  useEffect(() => {
+    fetchTasks(true); // Show loading on initial fetch
+  }, [fetchTasks]);
+
+  // Poll tasks every 15 seconds
+  useEffect(() => {
+    if (!todos) return;
+    const interval = setInterval(() => {
+      fetchTasks(false); // Silent polling, no loading flash
+    }, 15000); // 15 seconds
+    return () => clearInterval(interval);
+  }, [todos, fetchTasks]);
+
+  // Reset tasks scroll when tasks change
+  useEffect(() => {
+    setTasksScrollOffset(0);
+  }, [tasks]);
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    const maxScroll = getMaxChatScroll();
+    setChatScrollOffset(maxScroll); // Always show latest messages
+  }, [history, getMaxChatScroll]);
+
+  // Terminal resize handling
+  useEffect(() => {
+    const onResize = () => {
+      setTerminalSize({
+        width: process.stdout.columns || 80,
+        height: process.stdout.rows || 24,
+      });
     };
-  }, [setupPhase]);
-
-  useEffect(() => {
-    if (error || !logs || !todos) return;
-    const today = todayLogDate();
-    let cancelled = false;
-    setTodayLogLoadError(null);
-    (async () => {
-      try {
-        const [log] = await Promise.all([logs.findByDate(today), todos.listOpen()]);
-        if (!cancelled) {
-          setTodayLog(log ?? null);
-          setTodayLogLoadError(null);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setTodayLogLoadError(formatTodayLoadError(e));
-          setTodayLog(null);
-        }
-      }
-    })();
+    process.stdout.on('resize', onResize);
     return () => {
-      cancelled = true;
+      process.stdout.off('resize', onResize);
     };
-  }, [error, logs, todos]);
+  }, []);
 
-  const userName = resolved.profile.displayName;
-
-  useEffect(() => {
-    if (!errorMessage) return;
-    const t = setTimeout(() => setErrorMessage(null), 6000);
-    return () => clearTimeout(t);
-  }, [errorMessage]);
-
+  // Submit handler
   const submit = useCallback(async () => {
     const line = input.trim();
     setInput('');
-    setErrorMessage(null);
     if (!line) return;
+
     if (line === 'exit' || line === 'quit') {
       clearConsole();
       renderer.destroy();
       process.exit(0);
       return;
     }
-    if (line === '/clear') {
-      setHistory([]);
-      setLastReply('History cleared. Starting fresh.');
-      setRecent((r) => ['History cleared.', ...r].slice(0, 8));
-      return;
-    }
+
     if (!agent) return;
+
     setThinking(true);
-    setLastReply(null);
-    setActivityScroll(0);
-    setRecent((r) => ['You: ' + line, ...r].slice(0, 8));
+
     try {
       const reply = await agent.chat(line, history);
-      setHistory((h) => [...h, { role: 'user', content: line }, { role: 'assistant', content: reply }]);
-      setLastReply(reply);
-      setRecent((r) => ['Agent: ' + (reply.length > 60 ? reply.slice(0, 60) + '…' : reply), ...r].slice(0, 8));
-      if (logs) {
-        const today = todayLogDate();
-        try {
-          const log = await logs.findByDate(today);
-          setTodayLog(log ?? null);
-          setTodayLogLoadError(null);
-        } catch (e) {
-          setTodayLogLoadError(formatTodayLoadError(e));
-        }
-      }
+      setHistory((h) => [
+        ...h,
+        { role: 'user', content: line },
+        { role: 'assistant', content: reply },
+      ]);
+      // Refresh log after agent response (may have updated it)
+      fetchTodayLog();
     } catch (e) {
-      const msg = normalizeError(e);
-      setErrorMessage(msg);
-      setRecent((r) => ['Error: ' + msg, ...r].slice(0, 8));
+      setHistory((h) => [
+        ...h,
+        { role: 'user', content: line },
+        { role: 'assistant', content: `Error: ${e instanceof Error ? e.message : String(e)}` },
+      ]);
     } finally {
       setThinking(false);
     }
-  }, [input, agent, history, logs, renderer]);
+  }, [input, agent, history, renderer, fetchTodayLog]);
 
+  // Ref to track focused section (avoid stale closures)
+  const focusedSectionRef = useRef(focusedSection);
+  useEffect(() => {
+    focusedSectionRef.current = focusedSection;
+  }, [focusedSection]);
+
+  // Keyboard handling
   useKeyboard((key) => {
-    const openSettings = () => setPage('settings');
-    const goMain = () => setPage('main');
-    if (showHelp) {
-      setShowHelp(false);
+    const isWideScreen = terminalSize.width >= 100;
+
+    // Tab key - cycle through sections (different for small vs wide)
+    if (key.name === 'tab') {
+      setFocusedSection((current) => {
+        if (isWideScreen) {
+          // Wide screen: Log → Tasks → Chat
+          if (current === 'log') return 'tasks';
+          if (current === 'tasks') return 'chat';
+          return 'log';
+        } else {
+          // Small screen: Chat ↔ Tasks (no log)
+          if (current === 'chat') return 'tasks';
+          return 'chat';
+        }
+      });
       return;
     }
-    if (page === 'main' && key.name === '?' && input.length === 0) {
-      setShowHelp(true);
+
+    // Handle scroll keys for log, tasks, and chat sections
+    if (focusedSectionRef.current === 'log') {
+      if (key.name === 'up') {
+        setLogScrollOffset((offset) => Math.max(0, offset - 1));
+        return;
+      }
+      if (key.name === 'down') {
+        const maxScroll = getMaxLogScroll();
+        setLogScrollOffset((offset) => Math.min(maxScroll, offset + 1));
+        return;
+      }
+      return; // Don't handle other keys
+    }
+
+    if (focusedSectionRef.current === 'tasks') {
+      if (key.name === 'up') {
+        setTasksScrollOffset((offset) => Math.max(0, offset - 1));
+        return;
+      }
+      if (key.name === 'down') {
+        const maxScroll = getMaxTasksScroll();
+        setTasksScrollOffset((offset) => Math.min(maxScroll, offset + 1));
+        return;
+      }
+      return; // Don't handle other keys
+    }
+
+    // Chat is focused - handle both scroll and input
+    if (focusedSectionRef.current === 'chat') {
+      // Arrow keys scroll chat history
+      if (key.name === 'up') {
+        setChatScrollOffset((offset) => Math.max(0, offset - 1));
+        return;
+      }
+      if (key.name === 'down') {
+        const maxScroll = getMaxChatScroll();
+        setChatScrollOffset((offset) => Math.min(maxScroll, offset + 1));
+        return;
+      }
+      // Fall through to handle input keys below
+    } else {
+      // Not chat focused, don't handle other keys
       return;
     }
-    if (key.ctrl && key.name === 'p') {
-      if (page === 'main') openSettings();
-      else goMain();
-      return;
-    }
-    if (key.name === 'escape') {
-      if (page === 'settings') goMain();
-      return;
-    }
-    if (page === 'settings') {
-      if (columnScanError && key.name === 'escape') {
-        setColumnScanError(null);
-        onConfigSaved?.();
-        return;
-      }
-      if (setupPhase === 'mapping' && columnSuggestions && columnSuggestions.length > 0) {
-        const row = columnSuggestions[mappingStep];
-        if (key.name === 'return') {
-          const value = (mappingOverride.trim() || row?.suggested) ?? '';
-          setConfirmedColumnValues((prev) => ({ ...prev, [mappingStep]: value }));
-          setMappingOverride('');
-          if (mappingStep >= columnSuggestions.length - 1) {
-            const current = loadSettings();
-            columnSuggestions.forEach((r, i) => {
-              const v = i === mappingStep ? value : (confirmedColumnValues[i] ?? r.suggested) || r.suggested;
-              (current as Record<string, string>)[r.settingsKey] = v;
-            });
-            saveSettings(current);
-            setSetupPhase(null);
-            setColumnSuggestions(null);
-            setConfirmedColumnValues({});
-            onConfigSaved?.();
-          } else {
-            setMappingStep((s) => s + 1);
-          }
-          return;
-        }
-        if (key.name === 'escape') {
-          setSetupPhase(null);
-          setColumnSuggestions(null);
-          onConfigSaved?.();
-          return;
-        }
-        if (key.name === 'backspace' || key.name === 'delete') {
-          setMappingOverride((s) => s.slice(0, -1));
-          return;
-        }
-        const cMap = typeableChar(key);
-        if (cMap !== null) {
-          setMappingOverride((s) => s + cMap);
-          return;
-        }
-        return;
-      }
-      if (setupStep !== null) {
-        if (key.name === 'return') {
-          const step = SETUP_STEPS[setupStep];
-          if (step) {
-            const value = setupInput.trim();
-            const current = loadSettings();
-            (current as Record<string, string>)[step.key] = value;
-            saveSettings(current);
-            setSetupInput('');
-            if (setupStep >= SETUP_STEPS.length - 1) {
-              setSetupStep(null);
-              setSetupPhase('scanning');
-            } else {
-              setSetupStep(setupStep + 1);
-            }
-          }
-          return;
-        }
-        if (key.name === 'backspace' || key.name === 'delete') {
-          setSetupInput((s) => s.slice(0, -1));
-          return;
-        }
-        const c = typeableChar(key);
-        if (c !== null) {
-          setSetupInput((s) => s + c);
-          return;
-        }
-        if (key.name === 'escape') {
-          setSetupStep(null);
-          return;
-        }
-        return;
-      }
-      if (key.name === 'return') {
-        const name = settingsDisplayNameInput.trim();
-        if (name.length > 0) {
-          saveProfile({ displayName: name });
-          setSettingsDisplayNameInput('');
-        }
-        return;
-      }
-      if (key.name === 'backspace' || key.name === 'delete') {
-        setSettingsDisplayNameInput((s) => s.slice(0, -1));
-        return;
-      }
-      const c2 = typeableChar(key);
-      if (c2 !== null) {
-        setSettingsDisplayNameInput((s) => s + c2);
-        return;
-      }
-      return;
-    }
+
     if (key.name === 'return') {
       submit();
       return;
     }
+
     if (key.ctrl && key.name === 'c') {
       clearConsole();
       renderer.destroy();
       process.exit(0);
       return;
     }
+
     if (key.name === 'backspace' || key.name === 'delete') {
       setInput((s) => s.slice(0, -1));
       return;
     }
-    if (key.name === 'up') {
-      setActivityScroll((s) => Math.max(0, s - 1));
-      return;
-    }
-    if (key.name === 'down') {
-      setActivityScroll((s) => {
-        const n = recentCountRef.current;
-        const maxScroll = Math.max(0, n - ACTIVITY_VISIBLE_LINES);
-        return Math.min(maxScroll, s + 1);
-      });
-      return;
-    }
-    const c3 = typeableChar(key);
-    if (c3 !== null) {
-      setInput((s) => s + c3);
+
+    // Regular character input
+    if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
+      setInput((s) => s + key.sequence);
     }
   });
 
-  const { keyHandler } = useAppContext();
-  const inputStateRef = useRef({ page, setupStep, setupPhase });
-  useLayoutEffect(() => {
-    inputStateRef.current = { page, setupStep, setupPhase };
-  });
-  useEffect(() => {
-    if (!keyHandler) return;
-    const onPaste = (event: { text: string }) => {
-      const text = (event.text ?? '').replace(/\r?\n/g, ' ').trimEnd();
-      if (!text) return;
-      const { page: p, setupStep: step, setupPhase: phase } = inputStateRef.current;
-      if (p === 'settings') {
-        if (phase === 'mapping') setMappingOverride((s) => s + text);
-        else if (step !== null) setSetupInput((s) => s + text);
-        else setSettingsDisplayNameInput((s) => s + text);
-      } else {
-        setInput((s) => s + text);
-      }
-    };
-    keyHandler.on('paste', onPaste);
-    return () => {
-      keyHandler.off('paste', onPaste);
-    };
-  }, [keyHandler]);
+  // Check minimum size
+  const minWidth = 80;
+  const minHeight = 20;
 
-  if (page === 'settings') {
-    if (setupPhase === 'scanning') {
-      return <ColumnScanningContent spinner={spinScan} />;
-    }
-    if (setupPhase === 'mapping' && columnSuggestions && columnSuggestions.length > 0) {
-      const row = columnSuggestions[mappingStep];
-      if (row) {
-        return (
-          <ColumnMappingContent
-            row={row}
-            index={mappingStep}
-            total={columnSuggestions.length}
-            overrideInput={mappingOverride}
-          />
-        );
-      }
-    }
-    if (columnScanError) {
-      return (
-        <box style={{ flexDirection: 'column', padding: 1 }}>
-          <text style={{ attributes: TextAttributes.BOLD }} fg={designTokens.color.error}>Column scan failed</text>
-          <text fg={designTokens.color.error}>{columnScanError}</text>
-          <box style={{ marginTop: 1 }}>
-            <text fg={designTokens.color.muted}>Esc: skip column setup and continue. You can edit ~/.pa/settings.json later.</text>
-          </box>
-        </box>
-      );
-    }
-    if (setupStep !== null) {
-      return (
-        <FirstRunSetupContent setupStep={setupStep} setupInput={setupInput} />
-      );
-    }
+  if (terminalSize.width < minWidth || terminalSize.height < minHeight) {
     return (
-      <SettingsPageContent
-        displayNameInput={settingsDisplayNameInput}
-        setDisplayNameInput={setSettingsDisplayNameInput}
-        resolved={resolved}
-      />
+      <box style={{ flexDirection: 'column', padding: 1 }}>
+        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
+          Terminal too small
+        </text>
+        <text fg={designTokens.color.muted}>
+          Minimum: {minWidth}×{minHeight}, Current: {terminalSize.width}×{terminalSize.height}
+        </text>
+        <text fg={designTokens.color.muted}>Please resize your terminal.</text>
+      </box>
     );
   }
 
+  // Handle errors
   if (error) {
     return (
       <box style={{ flexDirection: 'column', padding: 1 }}>
-        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>Could not start</text>
-        <text fg={designTokens.color.error}>{error}</text>
-        <box style={{ marginTop: 1 }}>
-          <text fg={designTokens.color.muted}>Press Ctrl+P to open Profile & Settings, or set in .env / ~/.pa/settings.json</text>
+        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
+          Could not start
+        </text>
+        <text fg={designTokens.color.error}>{truncateText(error, terminalSize.width - 4)}</text>
+      </box>
+    );
+  }
+
+  if (!hasRequiredConfig()) {
+    return (
+      <box style={{ flexDirection: 'column', padding: 1 }}>
+        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
+          Configuration required
+        </text>
+        <text fg={designTokens.color.muted}>
+          Set NOTION_API_KEY, NOTION_LOGS_DATABASE_ID, NOTION_TODOS_DATABASE_ID
+        </text>
+      </box>
+    );
+  }
+
+  // Determine layout mode based on width
+  const isWideScreen = terminalSize.width >= 100;
+  const totalWidth = terminalSize.width;
+
+  // Calculate input box height based on terminal size
+  const inputMaxLines = terminalSize.height < 25 ? 2 : 3;
+
+  // Small screen layout (< 100 width)
+  if (!isWideScreen) {
+    const availableWidth = totalWidth - 2; // Account for parent padding
+    const chatColumnWidth = Math.floor(availableWidth * 0.6); // 60%
+    const tasksColumnWidth = availableWidth - chatColumnWidth; // 40%
+    const chatContentWidth = chatColumnWidth - 6;
+    const tasksContentWidth = tasksColumnWidth - 6;
+    const topbarContentWidth = totalWidth - 6;
+
+    return (
+      <box style={{ flexDirection: 'column', padding: 1, overflow: 'hidden', height: '100%' }}>
+        {/* Topbar - Compact Metrics */}
+        <TopbarSection todayLog={todayLog} loading={loadingLog} contentWidth={topbarContentWidth} />
+
+        {/* Two Columns: Chat (60%) + Tasks (40%) - grows to fill space */}
+        <box style={{ flexDirection: 'row', overflow: 'hidden', flexGrow: 1 }}>
+          {/* Left Column - Chat */}
+          <box style={{ flexDirection: 'column', width: chatColumnWidth, overflow: 'hidden' }}>
+            <ChatSection
+              history={history}
+              thinking={thinking}
+              spinThinking={spinThinking}
+              focused={focusedSection === 'chat'}
+              contentWidth={chatContentWidth}
+              scrollOffset={chatScrollOffset}
+            />
+          </box>
+
+          {/* Right Column - Tasks */}
+          <box style={{ flexDirection: 'column', width: tasksColumnWidth, overflow: 'hidden' }}>
+            <TasksSection
+              tasks={tasks}
+              loading={loadingTasks}
+              focused={focusedSection === 'tasks'}
+              contentWidth={tasksContentWidth}
+              scrollOffset={tasksScrollOffset}
+              maxVisibleItems={10}
+            />
+          </box>
         </box>
-        <box style={{ marginTop: 1 }}>
-          <text fg={designTokens.color.muted}>{FAKE_ENV_HINT}</text>
+
+        {/* Input - Pinned at bottom */}
+        <InputSection input={input} contentWidth={topbarContentWidth} maxLines={inputMaxLines} />
+
+        {/* Footer */}
+        <box>
+          <text fg={designTokens.color.muted}>
+            {truncateText(
+              focusedSection !== 'chat'
+                ? '↑↓: scroll | Tab: switch | Ctrl+C: exit'
+                : '↑↓: scroll | Tab: switch | Ctrl+C: exit',
+              topbarContentWidth
+            )}
+          </text>
         </box>
       </box>
     );
   }
 
-  const maxScroll = Math.max(0, recent.length - ACTIVITY_VISIBLE_LINES);
-  const start = Math.min(activityScroll, maxScroll);
-  const activityLines = recent.slice(start, start + ACTIVITY_VISIBLE_LINES);
+  // Wide screen layout (≥ 100 width) - Golden ratio
+  const availableWidth = totalWidth - 2; // Account for parent padding
+  const chatColumnWidth = Math.floor(availableWidth * 0.62); // 62%
+  const sidebarColumnWidth = availableWidth - chatColumnWidth; // 38%
+  const chatContentWidth = chatColumnWidth - 6;
+  const sidebarContentWidth = sidebarColumnWidth - 6;
 
   return (
-    <box style={{ flexDirection: 'column', padding: 1 }}>
-      <box style={{ flexDirection: 'row', marginBottom: 1 }}>
-        <box style={{ width: '50%', flexDirection: 'column', paddingRight: 2 }}>
-          <box style={{ flexDirection: 'column', borderStyle: 'single', padding: 1, marginBottom: 1 }}>
-            <text style={{ attributes: TextAttributes.BOLD }}>PA</text>
-            <text fg={designTokens.color.muted}>Self-discipline journal</text>
-            <box style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <text>Welcome back, {userName}</text>
-              {todayLog && todayLog !== 'loading' && todayLog.content.energy != null && (
-                <box style={{ flexDirection: 'row' }}>
-                  <text fg={designTokens.color.muted}>Your energy </text>
-                  <text fg={designTokens.color.accent}>{energyBarSegments(todayLog.content.energy).filled}</text>
-                  <text fg={designTokens.color.muted}>{energyBarSegments(todayLog.content.energy).empty}</text>
-                  <text fg={designTokens.color.muted}> {todayLog.content.energy}/100</text>
-                </box>
-              )}
-            </box>
-            <box style={{ marginTop: 1 }}>
-              <text fg={designTokens.color.accent}>{paxFrame}</text>
-            </box>
-            <box style={{ flexDirection: 'row' }}>
-              <text fg={designTokens.color.muted}>{AGENT_TAGLINE} · </text>
-              <text fg={designTokens.color.accent}>{AGENT_NAME}</text>
-            </box>
-          </box>
-          <box style={{ marginTop: 1, flexDirection: 'column' }}>
-            <text style={{ attributes: TextAttributes.BOLD }}>Last response</text>
-            <box style={{ height: LAST_RESPONSE_LINES, overflow: 'hidden', flexDirection: 'column', marginTop: 0 }}>
-              {lastReply !== null
-                ? lastReply
-                    .split('\n')
-                    .slice(0, LAST_RESPONSE_LINES)
-                    .map((line, i) => <text key={i}>{line}</text>)
-                : thinking
-                  ? (
-                    <>
-                      <text fg={designTokens.color.thinking}>{spinThinking}</text>
-                      <text fg={designTokens.color.thinking}> Thinking…</text>
-                    </>
-                    )
-                  : (
-                      <text fg={designTokens.color.muted}>— Ask something to see {AGENT_NAME} reply here.</text>
-                    )}
-            </box>
-          </box>
-          <box style={{ marginTop: 1, flexDirection: 'column' }}>
-            <text style={{ attributes: TextAttributes.BOLD }}>Today</text>
-            {todayLog === 'loading' && (
-              <>
-                <text fg={designTokens.color.muted}>{'\n'}</text>
-                <text fg={designTokens.color.loading}>{spinLoading}</text>
-                <text fg={designTokens.color.muted}> Loading…</text>
-              </>
-            )}
-            {todayLogLoadError && (
-              <text fg={designTokens.color.error}>{'\nError loading: ' + todayLogLoadError}</text>
-            )}
-            {todayLog && todayLog !== 'loading' && !todayLogLoadError && (
-              <text fg={designTokens.color.muted}>
-                {'\n' + (todayLog.content.title || 'Untitled') + (todayLog.content.notes ? ` — ${todayLog.content.notes.slice(0, 50)}${todayLog.content.notes.length > 50 ? '…' : ''}` : '')}
-              </text>
-            )}
-            {!todayLog && !todayLogLoadError && (
-              <text fg={designTokens.color.muted}>{"\nNo log for today yet.\nHow did you sleep? How's your mood after waking up?"}</text>
-            )}
-          </box>
+    <box style={{ flexDirection: 'column', padding: 1, overflow: 'hidden', height: '100%' }}>
+      {/* Main content row - grows to fill space */}
+      <box style={{ flexDirection: 'row', overflow: 'hidden', flexGrow: 1 }}>
+        {/* Left Column - Chat */}
+        <box style={{ flexDirection: 'column', width: chatColumnWidth, overflow: 'hidden' }}>
+          <ChatSection
+            history={history}
+            thinking={thinking}
+            spinThinking={spinThinking}
+            focused={focusedSection === 'chat'}
+            contentWidth={chatContentWidth}
+            scrollOffset={chatScrollOffset}
+          />
         </box>
-        <box style={{ width: '50%', flexDirection: 'column', borderStyle: 'single', paddingLeft: 1, paddingRight: 1 }}>
-          <text style={{ attributes: TextAttributes.BOLD }}>Tips</text>
-          {TIPS.map((t, i) => (
-            <text key={i} fg={designTokens.color.muted}>{t}</text>
-          ))}
-          <box style={{ marginTop: 1 }}>
-            <text style={{ attributes: TextAttributes.BOLD }}>Recent activity</text>
-            {recent.length > ACTIVITY_VISIBLE_LINES && <text fg={designTokens.color.muted}> ↑↓ scroll</text>}
-          </box>
-          <box style={{ height: ACTIVITY_VISIBLE_LINES, overflow: 'hidden', flexDirection: 'column' }}>
-            {recent.length === 0
-              ? <text fg={designTokens.color.muted}>No recent activity</text>
-              : activityLines.map((line, i) => (
-                  <text key={start + i} fg={designTokens.color.muted}>{line}</text>
-                ))}
-          </box>
+
+        {/* Right Column - Sidebar (Log + Tasks) */}
+        <box style={{ flexDirection: 'column', width: sidebarColumnWidth, overflow: 'hidden' }}>
+          <TodayLogSection
+            todayLog={todayLog}
+            loading={loadingLog}
+            focused={focusedSection === 'log'}
+            contentWidth={sidebarContentWidth}
+            scrollOffset={logScrollOffset}
+            maxVisibleLines={4}
+          />
+
+          <TasksSection
+            tasks={tasks}
+            loading={loadingTasks}
+            focused={focusedSection === 'tasks'}
+            contentWidth={sidebarContentWidth}
+            scrollOffset={tasksScrollOffset}
+            maxVisibleItems={8}
+          />
         </box>
       </box>
-      <box style={{ flexDirection: 'column', borderStyle: 'single', paddingLeft: 1, paddingRight: 1 }}>
-        <text>{'> ' + input + '▌'}</text>
+
+      {/* Input - Pinned at bottom */}
+      <InputSection input={input} contentWidth={chatContentWidth} maxLines={inputMaxLines} />
+
+      {/* Footer */}
+      <box>
+        <text fg={designTokens.color.muted}>
+          {truncateText('↑↓: scroll | Tab: switch | Ctrl+C: exit', chatContentWidth)}
+        </text>
       </box>
-      {errorMessage && (
-        <box style={{ marginTop: 1 }}>
-          <text fg={designTokens.color.error}>Error: {errorMessage}</text>
-        </box>
-      )}
-      <box style={{ marginTop: 1, flexDirection: 'row', justifyContent: 'space-between' }}>
-        <text fg={designTokens.color.muted}>? for shortcuts</text>
-        {thinking ? <text fg={designTokens.color.thinking}>{spinThinking} Thinking…</text> : <text fg={designTokens.color.muted}>Ready</text>}
-      </box>
-      {showHelp && (
-        <box style={{ marginTop: 1, borderStyle: 'single', padding: 1, flexDirection: 'column' }}>
-          <text style={{ attributes: TextAttributes.BOLD }}>Shortcuts</text>
-          <text fg={designTokens.color.muted}>{'\n? - this help\n/clear - clear chat history\nCtrl+P - Profile & Settings\nCtrl+C - exit\n↑ / ↓ - scroll recent activity\n\nPress any key to close'}</text>
-        </box>
-      )}
     </box>
   );
 }
