@@ -29,12 +29,17 @@ export function ChatSection({
   for (let msgIndex = 0; msgIndex < history.length; msgIndex++) {
     const msg = history[msgIndex];
     const rolePrefix = msg.role === 'user' ? 'You: ' : 'Pax: ';
+    const indent = '     '; // 5 spaces for continuation lines
     const wrappedLines = wrapText(msg.content, contentWidth - rolePrefix.length);
 
     for (let lineIndex = 0; lineIndex < wrappedLines.length; lineIndex++) {
+      const lineText = lineIndex === 0
+        ? rolePrefix + wrappedLines[lineIndex]
+        : indent + wrappedLines[lineIndex];
+
       allLines.push({
         role: msg.role,
-        text: lineIndex === 0 ? rolePrefix + wrappedLines[lineIndex] : '     ' + wrappedLines[lineIndex], // 5 spaces indent
+        text: truncateText(lineText, contentWidth), // Ensure no overflow
         lineIndex,
         msgIndex
       });

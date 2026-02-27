@@ -58,11 +58,13 @@ export function TodayLogSection({
     // Notes (wrapped)
     if (todayLog.content.notes) {
       const notesPrefix = '💭 ';
+      const indent = '   '; // 3 spaces for continuation lines
       const wrappedNotes = wrapText(todayLog.content.notes, contentWidth - notesPrefix.length);
       wrappedNotes.forEach((line, idx) => {
+        const lineText = idx === 0 ? notesPrefix + line : indent + line;
         logLines.push(
           <text key={`notes-${idx}`} fg={designTokens.color.muted}>
-            {idx === 0 ? notesPrefix + line : '   ' + line}
+            {truncateText(lineText, contentWidth)}
           </text>
         );
       });
@@ -91,11 +93,13 @@ export function TodayLogSection({
     // Gratitude (wrapped)
     if (todayLog.content.gratitude) {
       const gratitudePrefix = '🙏 ';
+      const indent = '   '; // 3 spaces for continuation lines
       const wrappedGratitude = wrapText(todayLog.content.gratitude, contentWidth - gratitudePrefix.length);
       wrappedGratitude.forEach((line, idx) => {
+        const lineText = idx === 0 ? gratitudePrefix + line : indent + line;
         logLines.push(
           <text key={`gratitude-${idx}`} fg={designTokens.color.muted}>
-            {idx === 0 ? gratitudePrefix + line : '   ' + line}
+            {truncateText(lineText, contentWidth)}
           </text>
         );
       });
