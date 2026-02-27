@@ -15,6 +15,7 @@ import { TasksSection } from './TasksSection';
 import { ChatSection } from './ChatSection';
 import { InputSection } from './InputSection';
 import { TopbarSection } from './TopbarSection';
+import { HelpModal } from './HelpModal';
 
 /**
  * Pax TUI - Clean implementation with proper overflow handling
@@ -42,6 +43,7 @@ export function App() {
   const [logScrollOffset, setLogScrollOffset] = useState(0);
   const [tasksScrollOffset, setTasksScrollOffset] = useState(0);
   const [chatScrollOffset, setChatScrollOffset] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
 
   const spinThinking = useSpinner(thinking);
 
@@ -172,6 +174,12 @@ export function App() {
       return;
     }
 
+    // Handle /clear command - wipe chat history
+    if (line === '/clear') {
+      setHistory([]);
+      return;
+    }
+
     if (!agent) return;
 
     setThinking(true);
@@ -205,6 +213,16 @@ export function App() {
   // Keyboard handling
   useKeyboard((key) => {
     const isWideScreen = terminalSize.width >= 100;
+
+    // Help modal - ? key toggles, any key closes when open
+    if (showHelp) {
+      setShowHelp(false);
+      return;
+    }
+    if (key.sequence === '?') {
+      setShowHelp(true);
+      return;
+    }
 
     // Tab key - cycle through sections (different for small vs wide)
     if (key.name === 'tab') {
@@ -390,12 +408,15 @@ export function App() {
           <text fg={designTokens.color.muted}>
             {truncateText(
               focusedSection !== 'chat'
-                ? '↑↓: scroll | Tab: switch | Ctrl+C: exit'
-                : '↑↓: scroll | Tab: switch | Ctrl+C: exit',
+                ? '↑↓: scroll | Tab: switch | ?: help | Ctrl+C: exit'
+                : '↑↓: scroll | Tab: switch | ?: help | Ctrl+C: exit',
               topbarContentWidth
             )}
           </text>
         </box>
+
+        {/* Help Modal */}
+        {showHelp && <HelpModal isWideScreen={false} />}
       </box>
     );
   }
@@ -451,9 +472,12 @@ export function App() {
       {/* Footer */}
       <box>
         <text fg={designTokens.color.muted}>
-          {truncateText('↑↓: scroll | Tab: switch | Ctrl+C: exit', chatContentWidth)}
+          {truncateText('↑↓: scroll | Tab: switch | ?: help | Ctrl+C: exit', chatContentWidth)}
         </text>
       </box>
+
+      {/* Help Modal */}
+      {showHelp && <HelpModal isWideScreen={true} />}
     </box>
   );
 }

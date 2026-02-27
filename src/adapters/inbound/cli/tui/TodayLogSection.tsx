@@ -2,6 +2,7 @@ import React from 'react';
 import { TextAttributes } from '@opentui/core';
 import { designTokens } from '../../../../design-tokens';
 import { truncateText, wrapText } from './wrapText';
+import { energyBarSegments } from './energyBarSegments';
 import type { DailyLog } from '../../../../domain/entities/daily-log';
 
 interface TodayLogSectionProps {
@@ -42,6 +43,16 @@ export function TodayLogSection({
           )}
         </text>
       );
+
+      // Energy bar visualization
+      if (todayLog.content.energy !== undefined) {
+        const { filled, empty } = energyBarSegments(todayLog.content.energy);
+        logLines.push(
+          <text key="energy-bar" fg={designTokens.color.muted}>
+            {truncateText(`${filled}${empty}`, contentWidth)}
+          </text>
+        );
+      }
     }
 
     // Notes (wrapped)

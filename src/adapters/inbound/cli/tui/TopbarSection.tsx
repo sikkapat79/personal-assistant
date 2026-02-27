@@ -1,6 +1,7 @@
 import React from 'react';
 import { designTokens } from '../../../../design-tokens';
 import { truncateText } from './wrapText';
+import { energyBarSegments } from './energyBarSegments';
 import type { DailyLog } from '../../../../domain/entities/daily-log';
 
 interface TopbarSectionProps {
@@ -34,7 +35,8 @@ export function TopbarSection({ todayLog, loading, contentWidth }: TopbarSection
   }
 
   if (todayLog.content.energy !== undefined) {
-    parts.push(`Energy: ${todayLog.content.energy}/100`);
+    const { filled, empty } = energyBarSegments(todayLog.content.energy);
+    parts.push(`${filled}${empty} ${todayLog.content.energy}/100`);
   }
 
   if (todayLog.content.deepWorkHours !== undefined) {
