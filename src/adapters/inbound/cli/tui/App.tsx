@@ -219,7 +219,8 @@ export function App() {
       setShowHelp(false);
       return;
     }
-    if (key.sequence === '?') {
+    // Check for ? (works with or without shift flag)
+    if (key.sequence === '?' || (key.name === '/' && key.shift)) {
       setShowHelp(true);
       return;
     }

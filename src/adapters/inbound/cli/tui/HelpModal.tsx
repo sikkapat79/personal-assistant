@@ -23,30 +23,17 @@ export function HelpModal({ isWideScreen }: HelpModalProps) {
     >
       <text style={{ attributes: TextAttributes.BOLD }}>Keyboard Shortcuts</text>
       <text> </text>
-      <text>
-        <text style={{ attributes: TextAttributes.BOLD }}>Tab</text> - Switch focus between sections
-      </text>
+      <text>Tab - Switch focus between sections</text>
       {isWideScreen ? (
-        <text fg={designTokens.color.muted}>      (Log → Tasks → Chat)</text>
+        <text fg={designTokens.color.muted}>    (Log → Tasks → Chat)</text>
       ) : (
-        <text fg={designTokens.color.muted}>      (Chat ↔ Tasks)</text>
+        <text fg={designTokens.color.muted}>    (Chat ↔ Tasks)</text>
       )}
-      <text>
-        <text style={{ attributes: TextAttributes.BOLD }}>↑ ↓</text> - Scroll focused section
-      </text>
-      <text>
-        <text style={{ attributes: TextAttributes.BOLD }}>Enter</text> - Send message (when chat
-        focused)
-      </text>
-      <text>
-        <text style={{ attributes: TextAttributes.BOLD }}>/clear</text> - Clear chat history
-      </text>
-      <text>
-        <text style={{ attributes: TextAttributes.BOLD }}>?</text> - Show this help
-      </text>
-      <text>
-        <text style={{ attributes: TextAttributes.BOLD }}>Ctrl+C</text> - Exit
-      </text>
+      <text>↑ ↓ - Scroll focused section</text>
+      <text>Enter - Send message (when chat focused)</text>
+      <text>/clear - Clear chat history</text>
+      <text>? - Show this help</text>
+      <text>Ctrl+C - Exit</text>
       <text> </text>
       <text fg={designTokens.color.muted}>Press any key to close...</text>
     </box>
