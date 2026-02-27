@@ -1,0 +1,144 @@
+{
+  "log": null,
+  "tasks": [
+    {
+      "id": "31228e77-d929-817a-b86c-f99dd14cd800",
+      "title": "Practice 3-minute summary of work",
+      "dueDate": "2026-02-25",
+      "status": "Todo",
+      "category": "Work",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "31228e77-d929-8114-bcf5-cd51b6866e5f",
+      "title": "Review pull request for authentication module",
+      "dueDate": "2026-02-25",
+      "status": "Todo",
+      "category": "Work",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "31228e77-d929-813f-a17b-c223b615e132",
+      "title": "Update documentation for API endpoints",
+      "dueDate": "2026-02-25",
+      "status": "Todo",
+      "category": "Work",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "31228e77-d929-8193-9b3d-c82118b66ca0",
+      "title": "Fix bug in user profile settings",
+      "dueDate": "2026-02-25",
+      "status": "Todo",
+      "category": "Work",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "31228e77-d929-8122-8836-c019339748c9",
+      "title": "Refactor database query optimization",
+      "dueDate": "2026-02-25",
+      "status": "Todo",
+      "category": "Work",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "31128e77-d929-818b-bcf3-ee4de1760e39",
+      "title": "Design mockups for mobile app",
+      "dueDate": "2026-02-25",
+      "status": "In Progress",
+      "category": "Work",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "31228e77-d929-81c9-9aeb-e3790d0bedef",
+      "title": "Complete code review for backend changes",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Work",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "31228e77-d929-8057-9359-c6f9283e7916",
+      "title": "Research new framework for frontend",
+      "dueDate": null,
+      "status": "In Progress",
+      "category": "Personal",
+      "notes": null,
+      "priority": "High"
+    },
+    {
+      "id": "30f28e77-d929-81ac-bf7a-f8ad24559bf5",
+      "title": "Complete code review for backend changes",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Personal",
+      "notes": null,
+      "priority": "Low"
+    },
+    {
+      "id": "30f28e77-d929-81ac-b1ff-e9cb557bb06a",
+      "title": "Deploy staging environment updates",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Personal",
+      "notes": null,
+      "priority": "Low"
+    },
+    {
+      "id": "30f28e77-d929-814c-af29-f58878eb78ae",
+      "title": "Investigate performance bottleneck in dashboard",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Personal",
+      "notes": null,
+      "priority": "Low"
+    },
+    {
+      "id": "30f28e77-d929-81c7-b808-e2d64783ff4f",
+      "title": "Implement error handling for payment flow",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Personal",
+      "notes": null,
+      "priority": "Low"
+    },
+    {
+      "id": "30f28e77-d929-815b-b47f-f3f95f31e8b3",
+      "title": "Design mockups for mobile app",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Personal",
+      "notes": null,
+      "priority": "Low"
+    },
+    {
+      "id": "30f28e77-d929-814e-990b-f946e3d4889d",
+      "title": "Optimize images for faster page load",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Personal",
+      "notes": null,
+      "priority": "Low"
+    },
+    {
+      "id": "30f28e77-d929-811a-bc0a-ef15e89d4f32",
+      "title": "Set up CI/CD pipeline for automated testing",
+      "dueDate": null,
+      "status": "Todo",
+      "category": "Personal",
+      "notes": null,
+      "priority": "Low"
+    }
+  ],
+  "_metadata": {
+    "generatedAt": "2026-02-27T17:59:03.595Z",
+    "note": "Sanitized data from Notion for mock testing"
+  }
+}

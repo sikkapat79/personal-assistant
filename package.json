@@ -14,6 +14,7 @@
     "today": "bun run src/adapters/inbound/cli/index.ts today",
     "ui": "bun run src/adapters/inbound/http/server.ts",
     "tui": "bun run src/adapters/inbound/cli/tui-app.tsx",
+    "tui:mock": "bun run src/adapters/inbound/cli/tui-app-mock.tsx",
     "test": "bun run typecheck && bun run test:tui-scroll",
     "test:tui-scroll": "bun tests/tui-activity-scroll.test.mjs",
     "test:notion-mapping": "bun tests/notion-mapping.test.ts",
