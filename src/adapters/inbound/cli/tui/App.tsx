@@ -10,6 +10,7 @@ import { clearConsole } from './clearConsole';
 import { todayLogDate, createLogDate } from '../../../../domain/value-objects/log-date';
 import type { DailyLog } from '../../../../domain/entities/daily-log';
 import type { TodoItemDto } from '../../../../application/dto/todo-dto';
+import type { Composition } from '../../../../composition';
 import { TodayLogSection } from './TodayLogSection';
 import { TasksSection } from './TasksSection';
 import { ChatSection } from './ChatSection';
@@ -17,13 +18,17 @@ import { InputSection } from './InputSection';
 import { TopbarSection } from './TopbarSection';
 import { HelpModal } from './HelpModal';
 
+interface AppProps {
+  composeFn?: () => Promise<Composition>;
+}
+
 /**
  * Pax TUI - Clean implementation with proper overflow handling
  */
-export function App() {
+export function App({ composeFn }: AppProps) {
   const renderer = useRenderer();
   const resolved = getResolvedConfig();
-  const { agent, logs, todos, error } = useAgent();
+  const { agent, logs, todos, error } = useAgent(composeFn);
 
   // Terminal dimensions
   const [terminalSize, setTerminalSize] = useState({

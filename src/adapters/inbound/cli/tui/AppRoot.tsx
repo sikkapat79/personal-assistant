@@ -1,5 +1,10 @@
 import { App } from './App';
+import type { Composition } from '../../../../composition';
 
-export function AppRoot() {
-  return <App />;
+interface AppRootProps {
+  composeFn?: () => Promise<Composition>;
+}
+
+export function AppRoot({ composeFn }: AppRootProps) {
+  return <App composeFn={composeFn} />;
 }
