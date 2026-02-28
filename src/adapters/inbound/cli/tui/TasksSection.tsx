@@ -36,7 +36,7 @@ export function TasksSection({
     for (let lineIndex = 0; lineIndex < wrappedLines.length; lineIndex++) {
       allLines.push({
         taskId: task.id,
-        text: lineIndex === 0 ? prefix + wrappedLines[lineIndex] : '      ' + wrappedLines[lineIndex], // 6 spaces indent
+        text: lineIndex === 0 ? prefix + wrappedLines[lineIndex] : '     ' + wrappedLines[lineIndex], // 5 spaces indent
         color,
         lineIndex,
         taskIndex
