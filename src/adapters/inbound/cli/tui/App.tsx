@@ -17,7 +17,6 @@ import { SETUP_STEPS, SETTINGS_STEPS } from './constants/setup';
 import { SettingsPageContent } from './SettingsPageContent';
 import { FirstRunSetupContent } from './FirstRunSetupContent';
 import type { Page } from './types';
-import { TodayLogSection } from './TodayLogSection';
 import { TasksSection } from './TasksSection';
 import { ChatSection } from './ChatSection';
 import { InputSection } from './InputSection';
@@ -381,10 +380,9 @@ export function App({ composeFn }: AppProps) {
     if (key.name === 'tab') {
       setFocusedSection((current) => {
         if (isWideScreen) {
-          // Wide screen: Log → Tasks → Chat
-          if (current === 'log') return 'tasks';
-          if (current === 'tasks') return 'chat';
-          return 'log';
+          // Wide screen: Chat ↔ Tasks (log is in top bar only)
+          if (current === 'chat') return 'tasks';
+          return 'chat';
         } else {
           // Small screen: Chat ↔ Tasks (no log)
           if (current === 'chat') return 'tasks';
@@ -595,9 +593,13 @@ export function App({ composeFn }: AppProps) {
   const sidebarColumnWidth = availableWidth - chatColumnWidth; // 38%
   const chatContentWidth = chatColumnWidth - 6;
   const sidebarContentWidth = sidebarColumnWidth - 6;
+  const topbarContentWidth = totalWidth - 6;
 
   return (
     <box style={{ flexDirection: 'column', padding: 1, overflow: 'hidden', height: '100%' }}>
+      {/* Topbar - Compact Metrics (same position as small screen) */}
+      <TopbarSection todayLog={todayLog} loading={loadingLog} contentWidth={topbarContentWidth} />
+
       {/* Main content row - grows to fill space */}
       <box style={{ flexDirection: 'row', overflow: 'hidden', flexGrow: 1 }}>
         {/* Left Column - Chat */}
@@ -612,17 +614,8 @@ export function App({ composeFn }: AppProps) {
           />
         </box>
 
-        {/* Right Column - Sidebar (Log + Tasks) */}
+        {/* Right Column - Sidebar (Tasks only; log is in top bar) */}
         <box style={{ flexDirection: 'column', width: sidebarColumnWidth, overflow: 'hidden' }}>
-          <TodayLogSection
-            todayLog={todayLog}
-            loading={loadingLog}
-            focused={focusedSection === 'log'}
-            contentWidth={sidebarContentWidth}
-            scrollOffset={logScrollOffset}
-            maxVisibleLines={4}
-          />
-
           <TasksSection
             tasks={tasks}
             loading={loadingTasks}
