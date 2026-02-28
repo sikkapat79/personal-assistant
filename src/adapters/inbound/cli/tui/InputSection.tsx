@@ -2,11 +2,10 @@ import React from 'react';
 
 interface InputSectionProps {
   input: string;
-  contentWidth: number;
   maxLines?: number;
 }
 
-export function InputSection({ input, contentWidth, maxLines = 3 }: InputSectionProps) {
+export function InputSection({ input, maxLines = 3 }: InputSectionProps) {
   // Show full input without truncation (wraps if needed)
   const displayText = input.length > 0 ? `> ${input}▌` : '> ▌';
 
