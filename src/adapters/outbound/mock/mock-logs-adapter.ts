@@ -11,18 +11,14 @@ export class MockLogsAdapter implements ILogsRepository {
   private mockData = mockDataJson;
 
   async findByDate(date: LogDate): Promise<DailyLog | null> {
-    // Return the mock log if it exists
     return this.mockData.log as DailyLog | null;
   }
 
   async findByDateRange(start: LogDate, end: LogDate): Promise<DailyLog[]> {
-    // For mock, just return the single log if it exists
     return this.mockData.log ? [this.mockData.log as DailyLog] : [];
   }
 
-  async save(log: DailyLog): Promise<DailyLog> {
-    // Mock save - just return the log unchanged
-    console.log('[MockLogsAdapter] save called (no-op):', log.date.value);
-    return log;
+  async save(log: DailyLog): Promise<void> {
+    console.log('[MockLogsAdapter] save called (no-op):', log.date);
   }
 }

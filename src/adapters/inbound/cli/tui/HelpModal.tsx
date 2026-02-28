@@ -1,6 +1,6 @@
 import React from 'react';
-import { TextAttributes } from '@opentui/core';
 import { designTokens } from '../../../../design-tokens';
+import { Modal } from './Modal';
 
 interface HelpModalProps {
   isWideScreen: boolean;
@@ -8,21 +8,7 @@ interface HelpModalProps {
 
 export function HelpModal({ isWideScreen }: HelpModalProps) {
   return (
-    <box
-      style={{
-        position: 'absolute',
-        top: 2,
-        left: 2,
-        right: 2,
-        bottom: 2,
-        borderStyle: 'double',
-        padding: 1,
-        overflow: 'hidden',
-        flexDirection: 'column',
-      }}
-    >
-      <text style={{ attributes: TextAttributes.BOLD }}>Keyboard Shortcuts</text>
-      <text> </text>
+    <Modal title="Keyboard Shortcuts">
       <text>Tab - Switch focus between sections</text>
       {isWideScreen ? (
         <text fg={designTokens.color.muted}>    (Log → Tasks → Chat)</text>
@@ -36,6 +22,6 @@ export function HelpModal({ isWideScreen }: HelpModalProps) {
       <text>Ctrl+C - Exit</text>
       <text> </text>
       <text fg={designTokens.color.muted}>Press any key to close...</text>
-    </box>
+    </Modal>
   );
 }

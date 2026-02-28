@@ -1,5 +1,8 @@
 import type { ITodosRepository } from '../../../application/ports/todos-repository';
-import type { TodoItemDto } from '../../../application/dto/todo-dto';
+import type { TodoUpdatePatch } from '../../../application/ports/todo-update-patch';
+import type { Todo, TodoStatus } from '../../../domain/entities/todo';
+import type { TodoId } from '../../../domain/value-objects/todo-id';
+import { createTodo } from '../../../domain/entities/todo';
 import mockDataJson from '../../../../fixtures/mock-data.json';
 
 /**
@@ -9,36 +12,44 @@ import mockDataJson from '../../../../fixtures/mock-data.json';
 export class MockTodosAdapter implements ITodosRepository {
   private mockData = mockDataJson;
 
-  async listAll(): Promise<TodoItemDto[]> {
-    return this.mockData.tasks as TodoItemDto[];
+  private toTodo(raw: (typeof mockDataJson.tasks)[number]): Todo {
+    return createTodo(
+      raw.title,
+      raw.dueDate ?? null,
+      raw.id,
+      raw.status as TodoStatus,
+      {
+        category: raw.category as Todo['category'],
+        notes: raw.notes ?? undefined,
+        priority: raw.priority as Todo['priority'],
+      }
+    );
   }
 
-  async listOpen(): Promise<TodoItemDto[]> {
-    const tasks = this.mockData.tasks as TodoItemDto[];
-    return tasks.filter(t => t.status === 'Todo' || t.status === 'In Progress');
+  async listAll(): Promise<Todo[]> {
+    return this.mockData.tasks.map(t => this.toTodo(t));
   }
 
-  async create(todo: Omit<TodoItemDto, 'id'>): Promise<TodoItemDto> {
-    const newTodo: TodoItemDto = {
-      ...todo,
-      id: `mock-${Date.now()}`,
-    };
-    console.log('[MockTodosAdapter] create called (no-op):', newTodo.title);
-    return newTodo;
+  async listOpen(): Promise<Todo[]> {
+    return this.mockData.tasks
+      .filter(t => t.status === 'Todo' || t.status === 'In Progress')
+      .map(t => this.toTodo(t));
   }
 
-  async update(id: string, updates: Partial<TodoItemDto>): Promise<TodoItemDto> {
-    const tasks = this.mockData.tasks as TodoItemDto[];
-    const existing = tasks.find(t => t.id === id);
-    if (!existing) {
-      throw new Error(`Task ${id} not found`);
-    }
-    const updated = { ...existing, ...updates };
-    console.log('[MockTodosAdapter] update called (no-op):', id);
-    return updated;
+  async add(todo: Todo): Promise<Todo> {
+    console.log('[MockTodosAdapter] add called (no-op):', todo.title);
+    return todo;
   }
 
-  async delete(id: string): Promise<void> {
+  async complete(id: TodoId): Promise<void> {
+    console.log('[MockTodosAdapter] complete called (no-op):', id);
+  }
+
+  async update(id: TodoId, patch: TodoUpdatePatch): Promise<void> {
+    console.log('[MockTodosAdapter] update called (no-op):', id, patch);
+  }
+
+  async delete(id: TodoId): Promise<void> {
     console.log('[MockTodosAdapter] delete called (no-op):', id);
   }
 }
