@@ -5,7 +5,7 @@ import { designTokens } from '../../../../design-tokens';
 import { getResolvedConfig, hasRequiredConfig } from '../../../../config/resolved';
 import { useAgent } from './useAgent';
 import { useSpinner } from './useSpinner';
-import { truncateText, calculateChatLineCount } from './wrapText';
+import { truncateText, calculateChatLineCount, wrapText } from './wrapText';
 import { clearConsole } from './clearConsole';
 import { todayLogDate, createLogDate } from '../../../../domain/value-objects/log-date';
 import type { DailyLog } from '../../../../domain/entities/daily-log';
@@ -69,21 +69,31 @@ export function App({ composeFn }: AppProps) {
 
   const spinThinking = useSpinner(thinking);
 
-  // Calculate max scroll offsets to prevent over-scrolling
+  // Calculate max scroll offsets to prevent over-scrolling (matches TodayLogSection rendered lines)
   const getMaxLogScroll = useCallback(() => {
     if (!todayLog) return 0;
+    const availableWidth = terminalSize.width - 2;
+    const sidebarColumnWidth = availableWidth - Math.floor(availableWidth * 0.62);
+    const contentWidth = sidebarColumnWidth - 6;
+    const prefixLen = 3; // '💭 ' / '🙏 ' prefix length for notes and gratitude
     let lineCount = 1; // title
-    if (todayLog.content.mood !== undefined || todayLog.content.energy !== undefined) lineCount++; // metrics
-    if (todayLog.content.notes) lineCount++;
+    if (todayLog.content.mood !== undefined || todayLog.content.energy !== undefined) {
+      lineCount += 1; // metrics line
+      if (todayLog.content.energy !== undefined) lineCount += 1; // energy bar
+    }
+    if (todayLog.content.notes)
+      lineCount += wrapText(todayLog.content.notes, contentWidth - prefixLen).length;
     if (
       todayLog.content.workout !== undefined ||
       todayLog.content.diet !== undefined ||
       todayLog.content.deepWorkHours !== undefined
     )
-      lineCount++;
-    if (todayLog.content.gratitude) lineCount++;
-    return Math.max(0, lineCount - 4); // 4 is maxVisibleLines in 2-column mode
-  }, [todayLog]);
+      lineCount += 1;
+    if (todayLog.content.gratitude)
+      lineCount += wrapText(todayLog.content.gratitude, contentWidth - prefixLen).length;
+    const maxVisibleLines = 4; // 2-column wide layout
+    return Math.max(0, lineCount - maxVisibleLines);
+  }, [todayLog, terminalSize.width]);
 
   const getMaxTasksScroll = useCallback(() => {
     const isWideScreen = terminalSize.width >= 100;
@@ -559,7 +569,7 @@ export function App({ composeFn }: AppProps) {
         </box>
 
         {/* Input - Pinned at bottom */}
-        <InputSection input={input} contentWidth={topbarContentWidth} maxLines={inputMaxLines} />
+        <InputSection input={input} maxLines={inputMaxLines} />
 
         {/* Footer */}
         <box>
@@ -625,7 +635,7 @@ export function App({ composeFn }: AppProps) {
       </box>
 
       {/* Input - Pinned at bottom */}
-      <InputSection input={input} contentWidth={chatContentWidth} maxLines={inputMaxLines} />
+      <InputSection input={input} maxLines={inputMaxLines} />
 
       {/* Footer */}
       <box>
