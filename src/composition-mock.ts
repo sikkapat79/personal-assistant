@@ -3,7 +3,7 @@ import type { ITodosRepository } from './application/ports/todos-repository';
 import type { IMetadataStore } from './application/ports/metadata-store';
 import { MockLogsAdapter } from './adapters/outbound/mock/mock-logs-adapter';
 import { MockTodosAdapter } from './adapters/outbound/mock/mock-todos-adapter';
-import { FileMetadataStore } from './adapters/outbound/file-metadata-store';
+import { InMemoryMetadataStore } from './adapters/outbound/mock/in-memory-metadata-store';
 import { FilesystemContextAdapter } from './adapters/outbound/context/filesystem-context-adapter';
 import { StubLLMAdapter } from './adapters/outbound/llm/stub-llm-adapter';
 import { LogUseCase } from './application/use-cases/log-use-case';
@@ -30,7 +30,7 @@ export async function composeMock(): Promise<Composition> {
   const todosUseCase = new TodosUseCase(todos);
   const context = new FilesystemContextAdapter();
   const llm = new StubLLMAdapter();
-  const metadataStore = new FileMetadataStore();
+  const metadataStore = new InMemoryMetadataStore();
   const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore);
 
   return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
