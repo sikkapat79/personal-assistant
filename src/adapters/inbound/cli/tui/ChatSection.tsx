@@ -64,7 +64,7 @@ export function ChatSection({
             {truncateText('Type a message and press Enter...', contentWidth)}
           </text>
         )}
-        {visibleLines.map((line, idx) => (
+        {visibleLines.map((line) => (
           <text
             key={`${line.msgIndex}-${line.lineIndex}`}
             fg={line.role === 'assistant' ? designTokens.color.muted : undefined}
