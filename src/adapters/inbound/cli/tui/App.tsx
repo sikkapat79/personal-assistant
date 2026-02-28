@@ -254,6 +254,8 @@ export function App({ composeFn }: AppProps) {
         if (settingsTab === 'api-keys' && apiKeysEditingIndex !== null) setApiKeysEditInput(s => s + text);
       } else if (!hasRequiredConfig()) {
         setSetupInput(s => s + text);
+      } else {
+        setInput(s => s + text);
       }
     };
     keyHandler.on('paste', handler);
@@ -264,6 +266,14 @@ export function App({ composeFn }: AppProps) {
   useKeyboard((key) => {
     const isWideScreen = terminalSize.width >= 100;
 
+    // Global Ctrl+C - always exits regardless of page or focus
+    if (key.ctrl && key.name === 'c') {
+      clearConsole();
+      renderer.destroy();
+      process.exit(0);
+      return;
+    }
+
     // Helper - filters key.sequence to printable ASCII chars only
     function printableInput(k: { ctrl?: boolean; meta?: boolean; sequence?: string }): string {
       if (k.ctrl || k.meta) return '';
@@ -272,7 +282,6 @@ export function App({ composeFn }: AppProps) {
 
     // Settings page input
     if (page === 'settings') {
-      if (key.ctrl && key.name === 'c') { clearConsole(); renderer.destroy(); process.exit(0); }
       if ((key.ctrl && key.name === 'p') || key.name === 'escape') { setPage('main'); return; }
       if (key.name === 'tab') {
         if (settingsTab === 'profile') {
@@ -322,7 +331,6 @@ export function App({ composeFn }: AppProps) {
 
     // No-config wizard keyboard handling
     if (!hasRequiredConfig() || setupStep >= SETUP_STEPS.length) {
-      if (key.ctrl && key.name === 'c') { clearConsole(); renderer.destroy(); process.exit(0); }
       // Confirmation screen — Enter/Tab goes to main
       if (setupStep >= SETUP_STEPS.length) {
         if (key.name === 'return' || key.name === 'tab') { setSetupStep(0); setSetupInput(''); }
@@ -354,8 +362,8 @@ export function App({ composeFn }: AppProps) {
       setShowHelp(false);
       return;
     }
-    // Check for ? (works with or without shift flag)
-    if (key.sequence === '?' || (key.name === '/' && key.shift)) {
+    // Check for ? (works with or without shift flag) - only when not typing
+    if (input.length === 0 && (key.sequence === '?' || (key.name === '/' && key.shift))) {
       setShowHelp(true);
       return;
     }
@@ -383,14 +391,6 @@ export function App({ composeFn }: AppProps) {
           return 'chat';
         }
       });
-      return;
-    }
-
-    // Global exit - must run before focus-specific handlers so Ctrl+C always works
-    if (key.ctrl && key.name === 'c') {
-      clearConsole();
-      renderer.destroy();
-      process.exit(0);
       return;
     }
 

@@ -70,7 +70,7 @@ export function SettingsPageContent({
               ? '> ' + (isSecret && apiKeysEditInput.length > 0
                   ? '•'.repeat(Math.min(apiKeysEditInput.length, 24))
                   : apiKeysEditInput) + '▌'
-              : maskSecret(currentVal);
+              : isSecret ? maskSecret(currentVal) : (currentVal ?? '');
 
             return (
               <box key={step.key} style={{ flexDirection: 'row' }}>
@@ -83,11 +83,6 @@ export function SettingsPageContent({
               </box>
             );
           })}
-          {apiKeysEditingIndex !== null && (
-            <box style={{ marginTop: 1 }}>
-              <text fg={designTokens.color.muted}>Enter: save  Esc: cancel</text>
-            </box>
-          )}
         </box>
       )}
 

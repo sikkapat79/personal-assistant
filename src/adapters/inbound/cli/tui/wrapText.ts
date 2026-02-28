@@ -61,6 +61,8 @@ export function wrapText(text: string, maxWidth: number): string[] {
  * Truncate text to fit within a specified width, adding ellipsis if needed.
  */
 export function truncateText(text: string, maxWidth: number): string {
+  if (maxWidth <= 0) return '';
+  if (maxWidth === 1) return '…';
   if (text.length <= maxWidth) return text;
   return text.slice(0, maxWidth - 1) + '…';
 }

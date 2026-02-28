@@ -49,6 +49,7 @@ const GENERIC_TASKS = [
 
 function sanitizeLog(log: DailyLog | null): DailyLog | null {
   if (!log) return null;
+  const seed = Number(log.date.slice(-2)) || 0;
 
   return {
     date: log.date,
@@ -56,13 +57,13 @@ function sanitizeLog(log: DailyLog | null): DailyLog | null {
       ...log.content,
       // Sanitize title so fixtures don't expose personal/project identifiers
       title: log.content.title ? 'Daily log entry' : '',
-      // Replace notes with placeholder (preserve presence)
+      // Replace notes with placeholder (preserve presence, deterministic)
       notes: log.content.notes
-        ? PLACEHOLDER_NOTES[Math.floor(Math.random() * PLACEHOLDER_NOTES.length)]
+        ? PLACEHOLDER_NOTES[seed % PLACEHOLDER_NOTES.length]
         : undefined,
-      // Replace gratitude with placeholder (preserve presence)
+      // Replace gratitude with placeholder (preserve presence, deterministic)
       gratitude: log.content.gratitude
-        ? PLACEHOLDER_GRATITUDE[Math.floor(Math.random() * PLACEHOLDER_GRATITUDE.length)]
+        ? PLACEHOLDER_GRATITUDE[seed % PLACEHOLDER_GRATITUDE.length]
         : undefined,
       // Numeric values (mood, energy, score, etc.) kept as-is (no personal info)
     },

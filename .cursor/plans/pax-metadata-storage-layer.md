@@ -144,12 +144,12 @@ So the **order of work** is: implement metadata layer first (or in parallel), th
 
 **Fixed vs dynamic:** For the **existing** logs and todos DBs we can keep current behavior (implicit in tools + prompt). For **dynamic** DBs (user-added, or page/block creation), schema comes from the metadata-backed cache and the strategy above. That way "each prompt we have to send up to date schema" is avoided: we send a compact, cached summary once per session and optionally on demand via a tool.
 
-**Port surface:** Extend `IMetadataStore` (or add a small `ISchemaProvider` used by the agent) with something like:
+**Port surface:** Extend `IMetadataStore` with getCachedSchema/setCachedSchema only. Keep the port minimal:
 
 - `getCachedSchema(databaseId: string): Promise<DatabaseSchema | null>`
-- `refreshSchemaFromNotion(databaseId: string): Promise<DatabaseSchema>` (fetch from API, write to metadata, return).
+- `setCachedSchema(databaseId: string, schema: DatabaseSchema): Promise<void>`
 
-The agent use-case (or a dedicated "build agent context" helper) then: at session start, calls `getCachedSchema` for each allowed DB, builds compact summary, injects into system prompt; and exposes `get_schema` tool that returns `getCachedSchema(id)` or `refreshSchemaFromNotion(id)` if cache miss.
+**Refresh logic** lives in the Notion adapter (or a small use-case): fetch from API, then call `setCachedSchema`. The agent use-case at session start calls `getCachedSchema` for each allowed DB, builds compact summary, injects into system prompt; and exposes `get_schema` tool that returns cached schema or triggers adapter refresh on cache miss.
 
 ---
 

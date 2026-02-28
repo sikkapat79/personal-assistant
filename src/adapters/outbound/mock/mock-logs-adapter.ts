@@ -11,11 +11,14 @@ export class MockLogsAdapter implements ILogsRepository {
   private mockData = mockDataJson;
 
   async findByDate(date: LogDate): Promise<DailyLog | null> {
-    return this.mockData.log as DailyLog | null;
+    const log = this.mockData.log as DailyLog | null;
+    return log && log.date === date ? log : null;
   }
 
   async findByDateRange(start: LogDate, end: LogDate): Promise<DailyLog[]> {
-    return this.mockData.log ? [this.mockData.log as DailyLog] : [];
+    const log = this.mockData.log as DailyLog | null;
+    if (!log) return [];
+    return log.date >= start && log.date <= end ? [log] : [];
   }
 
   async save(log: DailyLog): Promise<void> {

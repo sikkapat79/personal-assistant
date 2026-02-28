@@ -43,5 +43,5 @@ Document both in AGENTS.md (or equivalent) so neither is forgotten when context 
 
 - Document in AGENTS.md: (1) database purpose is generic, one per database, for many DBs; (2) column purpose is one per column; keep the two distinct.
 - In [notion-schema.ts](src/adapters/outbound/notion/notion-schema.ts): set `done` purpose to "Current state of the task (Todo, In Progress, Done)"; add a one-line note that each column has exactly one purpose.
-- Optional: in [.cursor/plans/pax-metadata-storage-layer.md](.cursor/plans/pax-metadata-storage-layer.md), add a line that database purpose is generic for all DBs and column purpose is single-responsibility per column.
+- Optional: in [pax-metadata-storage-layer.md](./pax-metadata-storage-layer.md), add a line that database purpose is generic for all DBs and column purpose is single-responsibility per column.
 - When adding extra databases later: store each DB's purpose in scope (e.g. `extraDatabases: { databaseId, purpose }[]`) so database purpose remains the single place for "what this DB is for."
