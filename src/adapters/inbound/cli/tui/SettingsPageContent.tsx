@@ -2,23 +2,23 @@ import { TextAttributes } from '@opentui/core';
 import { getResolvedConfig } from '../../../../config/resolved';
 import { designTokens } from '../../../../design-tokens';
 import { maskSecret } from './maskSecret';
-import { FirstRunSetupContent } from './FirstRunSetupContent';
+import { SETTINGS_STEPS } from './constants/setup';
 
 export function SettingsPageContent({
   displayNameInput,
-  setDisplayNameInput,
   savedDisplayName,
   settingsTab,
-  setupStep,
-  setupInput,
+  apiKeysSelectedRow,
+  apiKeysEditingIndex,
+  apiKeysEditInput,
   resolved,
 }: {
   displayNameInput: string;
-  setDisplayNameInput: (s: string) => void;
   savedDisplayName: string;
-  settingsTab: 'profile' | 'setup';
-  setupStep: number;
-  setupInput: string;
+  settingsTab: 'profile' | 'api-keys';
+  apiKeysSelectedRow: number;
+  apiKeysEditingIndex: number | null;
+  apiKeysEditInput: string;
   resolved: ReturnType<typeof getResolvedConfig>;
 }) {
   const s = resolved.settings;
@@ -37,10 +37,10 @@ export function SettingsPageContent({
         </text>
         <text fg={designTokens.color.muted}>  |  </text>
         <text
-          fg={settingsTab === 'setup' ? designTokens.color.accent : designTokens.color.muted}
-          style={{ attributes: settingsTab === 'setup' ? TextAttributes.BOLD : 0 }}
+          fg={settingsTab === 'api-keys' ? designTokens.color.accent : designTokens.color.muted}
+          style={{ attributes: settingsTab === 'api-keys' ? TextAttributes.BOLD : 0 }}
         >
-          Setup
+          API Keys
         </text>
       </box>
 
@@ -57,25 +57,46 @@ export function SettingsPageContent({
               {isDirty ? `Current: ${savedDisplayName} → ${displayNameInput}` : `Current: ${savedDisplayName}`}
             </text>
           </box>
-          <box style={{ marginTop: 1, flexDirection: 'column' }}>
-            <text style={{ attributes: TextAttributes.BOLD }}>Settings</text>
-            <text fg={designTokens.color.muted}>Notion API key: {maskSecret(s.NOTION_API_KEY)}</text>
-            <text fg={designTokens.color.muted}>Logs DB ID: {s.NOTION_LOGS_DATABASE_ID || 'Not set'}</text>
-            <text fg={designTokens.color.muted}>TODOs DB ID: {s.NOTION_TODOS_DATABASE_ID || 'Not set'}</text>
-            <text fg={designTokens.color.muted}>Parent page ID: {s.NOTION_PAGES_PARENT_ID || 'Not set'}</text>
-            {s.NOTION_PAGES_PARENT_ID ? (
-              <text fg={designTokens.color.muted}>Caution: If Pax creates a "Pax Metadata" database under this page, do not edit it manually—use Pax to change settings.</text>
-            ) : null}
-            <text fg={designTokens.color.muted}>OpenAI API key: {maskSecret(s.OPENAI_API_KEY)}</text>
-            <text fg={designTokens.color.muted}>OpenAI model: {s.OPENAI_MODEL ?? 'gpt-4o-mini'}</text>
-          </box>
         </>
       ) : (
-        <FirstRunSetupContent setupStep={setupStep} setupInput={setupInput} />
+        <box style={{ marginTop: 1, flexDirection: 'column' }}>
+          {SETTINGS_STEPS.map((step, i) => {
+            const isSelected = apiKeysSelectedRow === i;
+            const isEditing = apiKeysEditingIndex === i;
+            const isSecret = step.key === 'NOTION_API_KEY' || step.key === 'OPENAI_API_KEY';
+            const currentVal = s[step.key] as string | undefined;
+
+            const valueDisplay = isEditing
+              ? '> ' + (isSecret && apiKeysEditInput.length > 0
+                  ? '•'.repeat(Math.min(apiKeysEditInput.length, 24))
+                  : apiKeysEditInput) + '▌'
+              : maskSecret(currentVal);
+
+            return (
+              <box key={step.key} style={{ flexDirection: 'row' }}>
+                <text
+                  fg={isSelected ? designTokens.color.accent : designTokens.color.muted}
+                  style={{ attributes: isSelected ? TextAttributes.BOLD : 0 }}
+                >
+                  {(isSelected ? '> ' : '  ') + step.label + ': ' + valueDisplay}
+                </text>
+              </box>
+            );
+          })}
+          {apiKeysEditingIndex !== null && (
+            <box style={{ marginTop: 1 }}>
+              <text fg={designTokens.color.muted}>Enter: save  Esc: cancel</text>
+            </box>
+          )}
+        </box>
       )}
 
       <box style={{ marginTop: 1 }}>
-        <text fg={designTokens.color.muted}>Tab: switch | Ctrl+P or Esc: back to main</text>
+        <text fg={designTokens.color.muted}>
+          {settingsTab === 'api-keys' && apiKeysEditingIndex !== null
+            ? 'Enter: save  Esc: cancel'
+            : 'Tab: next field  Enter: edit  ↑↓: navigate  Ctrl+P or Esc: back'}
+        </text>
       </box>
     </box>
   );

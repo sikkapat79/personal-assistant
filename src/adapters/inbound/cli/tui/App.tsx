@@ -13,7 +13,7 @@ import type { TodoItemDto } from '../../../../application/dto/todo-dto';
 import type { Composition } from '../../../../composition';
 import { saveSettings, loadSettings } from '../../../../config/settings';
 import { saveProfile } from '../../../../config/profile';
-import { SETUP_STEPS } from './constants/setup';
+import { SETUP_STEPS, SETTINGS_STEPS } from './constants/setup';
 import { SettingsPageContent } from './SettingsPageContent';
 import { FirstRunSetupContent } from './FirstRunSetupContent';
 import type { Page } from './types';
@@ -60,9 +60,12 @@ export function App({ composeFn }: AppProps) {
   const [page, setPage] = useState<Page>('main');
   const [displayNameInput, setDisplayNameInput] = useState(resolved.profile.displayName);
   const [savedDisplayName, setSavedDisplayName] = useState(resolved.profile.displayName);
-  const [settingsTab, setSettingsTab] = useState<'profile' | 'setup'>('profile');
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'api-keys'>('profile');
   const [setupStep, setSetupStep] = useState(0);
   const [setupInput, setSetupInput] = useState('');
+  const [apiKeysSelectedRow, setApiKeysSelectedRow] = useState(0);
+  const [apiKeysEditingIndex, setApiKeysEditingIndex] = useState<number | null>(null);
+  const [apiKeysEditInput, setApiKeysEditInput] = useState('');
 
   const spinThinking = useSpinner(thinking);
 
@@ -238,14 +241,14 @@ export function App({ composeFn }: AppProps) {
       if (!text) return;
       if (page === 'settings') {
         if (settingsTab === 'profile') setDisplayNameInput(s => s + text);
-        if (settingsTab === 'setup') setSetupInput(s => s + text);
+        if (settingsTab === 'api-keys' && apiKeysEditingIndex !== null) setApiKeysEditInput(s => s + text);
       } else if (!hasRequiredConfig()) {
         setSetupInput(s => s + text);
       }
     };
     keyHandler.on('paste', handler);
     return () => { keyHandler.off('paste', handler); };
-  }, [keyHandler, page, settingsTab]);
+  }, [keyHandler, page, settingsTab, apiKeysEditingIndex]);
 
   // Keyboard handling
   useKeyboard((key) => {
@@ -262,8 +265,17 @@ export function App({ composeFn }: AppProps) {
       if (key.ctrl && key.name === 'c') { clearConsole(); renderer.destroy(); process.exit(0); }
       if ((key.ctrl && key.name === 'p') || key.name === 'escape') { setPage('main'); return; }
       if (key.name === 'tab') {
-        if (settingsTab === 'profile') { setSetupStep(0); setSetupInput(''); setSettingsTab('setup'); }
-        else setSettingsTab('profile');
+        if (settingsTab === 'profile') {
+          setApiKeysSelectedRow(0); setApiKeysEditingIndex(null); setApiKeysEditInput('');
+          setSettingsTab('api-keys');
+        } else if (settingsTab === 'api-keys' && apiKeysEditingIndex === null) {
+          const nextRow = apiKeysSelectedRow + 1;
+          if (nextRow >= SETTINGS_STEPS.length) {
+            setSettingsTab('profile');
+          } else {
+            setApiKeysSelectedRow(nextRow);
+          }
+        }
         return;
       }
 
@@ -275,41 +287,50 @@ export function App({ composeFn }: AppProps) {
         return;
       }
 
-      if (settingsTab === 'setup') {
-        if (key.name === 'return' || key.name === 'escape') {
-          if (key.name === 'return' && setupInput.trim()) {
-            const current = loadSettings();
-            saveSettings({ ...current, [SETUP_STEPS[setupStep].key]: setupInput.trim() });
+      if (settingsTab === 'api-keys') {
+        if (apiKeysEditingIndex !== null) {
+          if (key.name === 'return') {
+            if (apiKeysEditInput.trim()) {
+              const current = loadSettings();
+              saveSettings({ ...current, [SETTINGS_STEPS[apiKeysEditingIndex].key]: apiKeysEditInput.trim() });
+            }
+            setApiKeysEditingIndex(null); setApiKeysEditInput(''); return;
           }
-          const nextStep = setupStep + 1;
-          if (nextStep >= SETUP_STEPS.length) {
-            setSetupStep(0); setSetupInput(''); setSettingsTab('profile');
-          } else {
-            setSetupStep(nextStep); setSetupInput('');
-          }
+          if (key.name === 'escape') { setApiKeysEditingIndex(null); setApiKeysEditInput(''); return; }
+          if (key.name === 'backspace' || key.name === 'delete') { setApiKeysEditInput(s => s.slice(0, -1)); return; }
+          const ch = printableInput(key);
+          if (ch) setApiKeysEditInput(s => s + ch);
           return;
         }
-        if (key.name === 'backspace' || key.name === 'delete') { setSetupInput(s => s.slice(0, -1)); return; }
-        const ch = printableInput(key);
-        if (ch) setSetupInput(s => s + ch);
+        // Not editing — navigation
+        if (key.name === 'up') { setApiKeysSelectedRow(r => Math.max(0, r - 1)); return; }
+        if (key.name === 'down') { setApiKeysSelectedRow(r => Math.min(SETTINGS_STEPS.length - 1, r + 1)); return; }
+        if (key.name === 'return') { setApiKeysEditingIndex(apiKeysSelectedRow); setApiKeysEditInput(''); return; }
         return;
       }
     }
 
     // No-config wizard keyboard handling
-    if (!hasRequiredConfig()) {
+    if (!hasRequiredConfig() || setupStep >= SETUP_STEPS.length) {
       if (key.ctrl && key.name === 'c') { clearConsole(); renderer.destroy(); process.exit(0); }
-      if (key.name === 'return' || key.name === 'escape') {
-        if (key.name === 'return' && setupInput.trim()) {
-          const current = loadSettings();
-          saveSettings({ ...current, [SETUP_STEPS[setupStep].key]: setupInput.trim() });
+      // Confirmation screen — Enter/Tab goes to main
+      if (setupStep >= SETUP_STEPS.length) {
+        if (key.name === 'return' || key.name === 'tab') { setSetupStep(0); setSetupInput(''); }
+        return;
+      }
+      // Regular step
+      if (key.name === 'return' || key.name === 'tab' || key.name === 'escape') {
+        if ((key.name === 'return' || key.name === 'tab') && setupInput.trim()) {
+          const step = SETUP_STEPS[setupStep];
+          if (step.type === 'profile') {
+            saveProfile({ displayName: setupInput.trim() });
+            setSavedDisplayName(setupInput.trim());
+          } else {
+            const current = loadSettings();
+            saveSettings({ ...current, [step.key]: setupInput.trim() });
+          }
         }
-        const nextStep = setupStep + 1;
-        if (nextStep >= SETUP_STEPS.length) {
-          setSetupStep(0); setSetupInput('');
-        } else {
-          setSetupStep(nextStep); setSetupInput('');
-        }
+        setSetupStep(setupStep + 1); setSetupInput('');
         return;
       }
       if (key.name === 'backspace' || key.name === 'delete') { setSetupInput(s => s.slice(0, -1)); return; }
@@ -333,6 +354,7 @@ export function App({ composeFn }: AppProps) {
       setDisplayNameInput(resolved.profile.displayName);
       setSavedDisplayName(resolved.profile.displayName);
       setSettingsTab('profile');
+      setApiKeysSelectedRow(0); setApiKeysEditingIndex(null); setApiKeysEditInput('');
       setPage('settings');
       return;
     }
@@ -440,15 +462,22 @@ export function App({ composeFn }: AppProps) {
     );
   }
 
+  const currentStepDef = SETUP_STEPS[setupStep];
+  const currentStepValue = currentStepDef
+    ? currentStepDef.type === 'profile'
+      ? resolved.profile.displayName
+      : (resolved.settings[currentStepDef.key] as string | undefined)
+    : undefined;
+
   if (page === 'settings') {
     return (
       <SettingsPageContent
         displayNameInput={displayNameInput}
-        setDisplayNameInput={setDisplayNameInput}
         savedDisplayName={savedDisplayName}
         settingsTab={settingsTab}
-        setupStep={setupStep}
-        setupInput={setupInput}
+        apiKeysSelectedRow={apiKeysSelectedRow}
+        apiKeysEditingIndex={apiKeysEditingIndex}
+        apiKeysEditInput={apiKeysEditInput}
         resolved={resolved}
       />
     );
@@ -466,8 +495,16 @@ export function App({ composeFn }: AppProps) {
     );
   }
 
-  if (!hasRequiredConfig()) {
-    return <FirstRunSetupContent setupStep={setupStep} setupInput={setupInput} />;
+  if (!hasRequiredConfig() || setupStep >= SETUP_STEPS.length) {
+    return (
+      <FirstRunSetupContent
+        setupStep={setupStep}
+        setupInput={setupInput}
+        currentValue={currentStepValue}
+        settings={setupStep >= SETUP_STEPS.length ? loadSettings() : undefined}
+        displayName={setupStep >= SETUP_STEPS.length ? resolved.profile.displayName : undefined}
+      />
+    );
   }
 
   // Determine layout mode based on width
