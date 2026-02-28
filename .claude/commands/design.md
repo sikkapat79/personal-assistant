@@ -89,7 +89,7 @@ Only after thorough discovery, begin designing:
    - How testable is it?
 
 4. **Use ADR Format for Each Alternative**:
-```
+```markdown
 ## Alternative [N]: [Name]
 
 ### Description
@@ -137,7 +137,7 @@ Only after thorough discovery, begin designing:
 Once approach is selected:
 
 1. **Architecture Diagram** (ASCII art):
-```
+```text
 Example:
 ┌─────────────┐
 │   Client    │
@@ -178,7 +178,7 @@ Example:
    - Error handling
 
 5. **Key Design Decisions** (ADR style):
-```
+```markdown
 ### Decision: [What we decided]
 
 **Context**: [Why this decision was needed]
@@ -261,7 +261,7 @@ Before finalizing:
 ## Architectural Patterns Reference
 
 ### Layered Architecture
-```
+```text
 ┌─────────────────────────────┐
 │   Presentation Layer        │  (UI, Controllers)
 ├─────────────────────────────┤
@@ -274,7 +274,7 @@ Before finalizing:
 ```
 
 ### Hexagonal (Ports & Adapters)
-```
+```text
         ┌────────────────┐
         │   Adapters     │  (HTTP, CLI, GUI)
         │   (Driving)    │

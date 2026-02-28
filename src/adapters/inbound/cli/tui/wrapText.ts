@@ -1,3 +1,5 @@
+import { AGENT_NAME } from '../../../../config/branding';
+
 /**
  * Word-wrap text to fit within a specified width.
  * Preserves existing line breaks and wraps long lines at word boundaries.
@@ -77,7 +79,7 @@ export function calculateChatLineCount(
 ): number {
   let totalLines = 0;
   for (const msg of history) {
-    const rolePrefix = msg.role === 'user' ? 'You: ' : 'Pax: ';
+    const rolePrefix = msg.role === 'user' ? 'You: ' : `${AGENT_NAME}: `;
     const wrappedLines = wrapText(msg.content, contentWidth - rolePrefix.length);
     totalLines += wrappedLines.length;
   }

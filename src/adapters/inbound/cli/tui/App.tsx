@@ -25,12 +25,13 @@ import { HelpModal } from './HelpModal';
 
 interface AppProps {
   composeFn?: () => Promise<Composition>;
+  onConfigSaved?: () => void;
 }
 
 /**
  * Pax TUI - Clean implementation with proper overflow handling
  */
-export function App({ composeFn }: AppProps) {
+export function App({ composeFn, onConfigSaved }: AppProps) {
   const renderer = useRenderer();
   const resolved = getResolvedConfig();
   const { agent, logs, todos, error } = useAgent(composeFn);
@@ -96,8 +97,22 @@ export function App({ composeFn }: AppProps) {
 
   const getMaxTasksScroll = useCallback(() => {
     const isWideScreen = terminalSize.width >= 100;
-    const maxVisible = isWideScreen ? 8 : 10; // 8 for wide, 10 for small
-    return Math.max(0, tasks.length - maxVisible);
+    const maxVisible = isWideScreen ? 8 : 10;
+    const availableWidth = terminalSize.width - 2;
+    const chatColumnWidth = Math.floor(availableWidth * (isWideScreen ? 0.62 : 0.6));
+    const tasksColumnWidth = availableWidth - chatColumnWidth;
+    const contentWidth = tasksColumnWidth - 6;
+
+    let totalLines = 0;
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      const statusIcon = task.status === 'In Progress' ? '▶' : '○';
+      const prefix = `${i + 1}. ${statusIcon} `;
+      const suffix = task.priority ? ` (${task.priority})` : '';
+      const wrapped = wrapText(task.title + suffix, Math.max(1, contentWidth - prefix.length));
+      totalLines += wrapped.length;
+    }
+    return Math.max(0, totalLines - maxVisible);
   }, [tasks, terminalSize.width]);
 
   const getMaxChatScroll = useCallback(() => {
@@ -167,15 +182,18 @@ export function App({ composeFn }: AppProps) {
     return () => clearInterval(interval);
   }, [todos, fetchTasks]);
 
-  // Reset tasks scroll when tasks change
+  // Clamp tasks scroll when tasks change (preserve position during polling)
   useEffect(() => {
-    setTasksScrollOffset(0);
-  }, [tasks]);
+    setTasksScrollOffset((offset) => Math.min(offset, getMaxTasksScroll()));
+  }, [tasks, getMaxTasksScroll]);
 
-  // Auto-scroll chat to bottom when new messages arrive
+  // Auto-scroll chat to bottom when new messages arrive (only if already near bottom)
+  const AUTO_SCROLL_THRESHOLD = 3;
   useEffect(() => {
     const maxScroll = getMaxChatScroll();
-    setChatScrollOffset(maxScroll); // Always show latest messages
+    setChatScrollOffset((current) =>
+      current >= maxScroll - AUTO_SCROLL_THRESHOLD ? maxScroll : current
+    );
   }, [history, getMaxChatScroll]);
 
   // Terminal resize handling
@@ -281,7 +299,16 @@ export function App({ composeFn }: AppProps) {
 
     // Settings page input
     if (page === 'settings') {
-      if ((key.ctrl && key.name === 'p') || key.name === 'escape') { setPage('main'); return; }
+      // Escape cancels in-progress API key edit first; only then goes to main
+      if (settingsTab === 'api-keys' && apiKeysEditingIndex !== null && key.name === 'escape') {
+        setApiKeysEditingIndex(null);
+        setApiKeysEditInput('');
+        return;
+      }
+      if ((key.ctrl && key.name === 'p') || key.name === 'escape') {
+        setPage('main');
+        return;
+      }
       if (key.name === 'tab') {
         if (settingsTab === 'profile') {
           setApiKeysSelectedRow(0); setApiKeysEditingIndex(null); setApiKeysEditInput('');
@@ -328,11 +355,15 @@ export function App({ composeFn }: AppProps) {
       }
     }
 
-    // No-config wizard keyboard handling
-    if (!hasRequiredConfig() || setupStep >= SETUP_STEPS.length) {
+    // No-config wizard keyboard handling (show until user leaves confirmation)
+    if (!hasRequiredConfig() || (setupStep > 0 && setupStep <= SETUP_STEPS.length)) {
       // Confirmation screen — Enter/Tab goes to main
       if (setupStep >= SETUP_STEPS.length) {
-        if (key.name === 'return' || key.name === 'tab') { setSetupStep(0); setSetupInput(''); }
+        if (key.name === 'return' || key.name === 'tab') {
+          setSetupStep(0);
+          setSetupInput('');
+          onConfigSaved?.();
+        }
         return;
       }
       // Regular step
@@ -494,7 +525,8 @@ export function App({ composeFn }: AppProps) {
 
   // First-run wizard before error: when config is missing, compose() throws and sets error,
   // but we must show the wizard so the user can enter credentials (not "Could not start").
-  if (!hasRequiredConfig() || setupStep >= SETUP_STEPS.length) {
+  // Show until user completes all steps and leaves confirmation (setupStep reset to 0).
+  if (!hasRequiredConfig() || (setupStep > 0 && setupStep <= SETUP_STEPS.length)) {
     return (
       <FirstRunSetupContent
         setupStep={setupStep}
@@ -573,16 +605,14 @@ export function App({ composeFn }: AppProps) {
         <box>
           <text fg={designTokens.color.muted}>
             {truncateText(
-              focusedSection !== 'chat'
-                ? '↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit'
-                : '↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit',
+              '↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit',
               topbarContentWidth
             )}
           </text>
         </box>
 
         {/* Help Modal */}
-        {showHelp && <HelpModal isWideScreen={false} />}
+        {showHelp && <HelpModal />}
       </box>
     );
   }
@@ -638,7 +668,7 @@ export function App({ composeFn }: AppProps) {
       </box>
 
       {/* Help Modal */}
-      {showHelp && <HelpModal isWideScreen={true} />}
+      {showHelp && <HelpModal />}
     </box>
   );
 }

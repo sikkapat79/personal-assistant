@@ -29,7 +29,7 @@ export function ChatSection({
   for (let msgIndex = 0; msgIndex < history.length; msgIndex++) {
     const msg = history[msgIndex];
     const rolePrefix = msg.role === 'user' ? 'You: ' : `${AGENT_NAME}: `;
-    const indent = '     '; // 5 spaces for continuation lines
+    const indent = ' '.repeat(rolePrefix.length);
     const wrappedLines = wrapText(msg.content, contentWidth - rolePrefix.length);
 
     for (let lineIndex = 0; lineIndex < wrappedLines.length; lineIndex++) {

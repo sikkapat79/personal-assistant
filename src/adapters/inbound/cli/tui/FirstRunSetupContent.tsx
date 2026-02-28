@@ -1,6 +1,6 @@
 import { TextAttributes } from '@opentui/core';
 import { designTokens } from '../../../../design-tokens';
-import { SETUP_STEPS } from './constants/setup';
+import { SETUP_STEPS, SECRET_KEYS } from './constants/setup';
 import { maskSecret } from './maskSecret';
 import type { Settings } from '../../../../config/settings';
 
@@ -70,7 +70,7 @@ export function FirstRunSetupContent({
 
   const step = SETUP_STEPS[setupStep];
   if (!step) return null;
-  const isSecret = step.type === 'settings' && (step.key === 'NOTION_API_KEY' || step.key === 'OPENAI_API_KEY');
+  const isSecret = step.type === 'settings' && SECRET_KEYS.has(step.key);
   const filled = setupStep + 1;
   const progressBar = '█'.repeat(filled) + '░'.repeat(total - filled);
   const maskedCurrent = currentValue

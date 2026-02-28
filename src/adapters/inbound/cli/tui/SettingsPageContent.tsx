@@ -2,7 +2,7 @@ import { TextAttributes } from '@opentui/core';
 import { getResolvedConfig } from '../../../../config/resolved';
 import { designTokens } from '../../../../design-tokens';
 import { maskSecret } from './maskSecret';
-import { SETTINGS_STEPS } from './constants/setup';
+import { SETTINGS_STEPS, SECRET_KEYS } from './constants/setup';
 
 export function SettingsPageContent({
   displayNameInput,
@@ -63,14 +63,16 @@ export function SettingsPageContent({
           {SETTINGS_STEPS.map((step, i) => {
             const isSelected = apiKeysSelectedRow === i;
             const isEditing = apiKeysEditingIndex === i;
-            const isSecret = step.key === 'NOTION_API_KEY' || step.key === 'OPENAI_API_KEY';
+            const isSecret = SECRET_KEYS.has(step.key);
             const currentVal = s[step.key] as string | undefined;
 
             const valueDisplay = isEditing
               ? '> ' + (isSecret && apiKeysEditInput.length > 0
                   ? '•'.repeat(Math.min(apiKeysEditInput.length, 24))
                   : apiKeysEditInput) + '▌'
-              : isSecret ? maskSecret(currentVal) : (currentVal ?? '');
+              : isSecret
+                ? maskSecret(currentVal)
+                : (currentVal && currentVal.length > 0 ? currentVal : 'Not set');
 
             return (
               <box key={step.key} style={{ flexDirection: 'row' }}>

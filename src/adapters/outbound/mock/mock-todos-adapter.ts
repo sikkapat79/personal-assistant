@@ -1,9 +1,13 @@
 import type { ITodosRepository } from '../../../application/ports/todos-repository';
 import type { TodoUpdatePatch } from '../../../application/ports/todo-update-patch';
-import type { Todo, TodoStatus } from '../../../domain/entities/todo';
+import type { Todo, TodoStatus, TodoCategory, TodoPriority } from '../../../domain/entities/todo';
 import type { TodoId } from '../../../domain/value-objects/todo-id';
 import { createTodo } from '../../../domain/entities/todo';
 import mockDataJson from '../../../../fixtures/mock-data.json';
+
+const VALID_STATUSES: TodoStatus[] = ['Todo', 'In Progress', 'Done'];
+const VALID_CATEGORIES: TodoCategory[] = ['Work', 'Health', 'Personal', 'Learning'];
+const VALID_PRIORITIES: TodoPriority[] = ['High', 'Medium', 'Low'];
 
 /**
  * Mock Todos Adapter - Returns sanitized data from fixtures
@@ -13,16 +17,38 @@ export class MockTodosAdapter implements ITodosRepository {
   private mockData = mockDataJson;
 
   private toTodo(raw: (typeof mockDataJson.tasks)[number]): Todo {
-    return createTodo(
-      raw.title,
-      raw.dueDate ?? null,
-      raw.id,
-      raw.status as TodoStatus,
-      {
-        category: raw.category as Todo['category'],
-        notes: raw.notes ?? undefined,
-        priority: raw.priority as Todo['priority'],
-      }
+    const status = this.parseStatus(raw);
+    const category = this.parseCategory(raw);
+    const priority = this.parsePriority(raw);
+
+    return createTodo(raw.title, raw.dueDate ?? null, raw.id, status, {
+      category,
+      notes: raw.notes ?? undefined,
+      priority,
+    });
+  }
+
+  private parseStatus(raw: (typeof mockDataJson.tasks)[number]): TodoStatus {
+    if (!raw.status) return 'Todo';
+    if (VALID_STATUSES.includes(raw.status as TodoStatus)) return raw.status as TodoStatus;
+    throw new Error(
+      `Invalid fixture: task "${raw.id}" has status "${raw.status}" (expected: ${VALID_STATUSES.join(', ')})`
+    );
+  }
+
+  private parseCategory(raw: (typeof mockDataJson.tasks)[number]): TodoCategory | undefined {
+    if (raw.category == null) return undefined;
+    if (VALID_CATEGORIES.includes(raw.category as TodoCategory)) return raw.category as TodoCategory;
+    throw new Error(
+      `Invalid fixture: task "${raw.id}" has category "${raw.category}" (expected: ${VALID_CATEGORIES.join(', ')})`
+    );
+  }
+
+  private parsePriority(raw: (typeof mockDataJson.tasks)[number]): TodoPriority | undefined {
+    if (raw.priority == null) return undefined;
+    if (VALID_PRIORITIES.includes(raw.priority as TodoPriority)) return raw.priority as TodoPriority;
+    throw new Error(
+      `Invalid fixture: task "${raw.id}" has priority "${raw.priority}" (expected: ${VALID_PRIORITIES.join(', ')})`
     );
   }
 

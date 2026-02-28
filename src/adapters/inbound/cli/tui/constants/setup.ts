@@ -1,6 +1,9 @@
 import { AGENT_NAME } from '../../../../../config/branding';
 import type { Settings } from '../../../../../config/settings';
 
+/** Keys that hold secrets and should be masked in the UI. */
+export const SECRET_KEYS = new Set<string>(['NOTION_API_KEY', 'OPENAI_API_KEY']);
+
 type SettingsStep = { type: 'settings'; key: keyof Settings; tab: string; label: string };
 type ProfileStep = { type: 'profile'; key: 'displayName'; tab: string; label: string };
 export type SetupStep = SettingsStep | ProfileStep;

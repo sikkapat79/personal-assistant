@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { App } from './App';
 import type { Composition } from '../../../../composition';
 
@@ -6,5 +7,12 @@ interface AppRootProps {
 }
 
 export function AppRoot({ composeFn }: AppRootProps) {
-  return <App composeFn={composeFn} />;
+  const [configVersion, setConfigVersion] = useState(0);
+  return (
+    <App
+      key={configVersion}
+      composeFn={composeFn}
+      onConfigSaved={() => setConfigVersion((v) => v + 1)}
+    />
+  );
 }

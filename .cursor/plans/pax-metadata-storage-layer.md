@@ -138,11 +138,11 @@ So the **order of work** is: implement metadata layer first (or in parallel), th
 
 **Recommendation (hybrid):**
 
-1. **Store** full schema in metadata: for each allowed DB, cache property names and types (from Notion when DB is added or on first use; optional TTL or manual refresh). So "up to date" is maintained in the store, not by refetching every prompt.
+1. **Store** full schema in metadata: for each allowed DB, cache property names and types (from Notion when DB is added or on first use; optional TTL or manual refresh). So "up-to-date" is maintained in the store, not by refetching every prompt.
 2. **Inject a compact summary at session start:** When the agent session starts (first message), build a short "Databases and properties" block from the metadata store (e.g. "Logs: date, title, score, mood, energy, …; Todos: title, category, due_date, …; [other DBs]") and add it once to the system prompt. Don't re-send every turn. Keeps the agent aware of structure without per-request cost.
 3. **Add a get_schema tool:** `get_schema(database_id)` or `get_database_properties(database_id)` returns the full property list (and types) for that DB. Use when the agent works with a new or rarely used DB and needs detail. Implement by reading from metadata cache (or fetching from Notion if missing) and returning a structured summary. So we **don't** send full schema every prompt; we send compact once per session and allow on-demand detail.
 
-**Fixed vs dynamic:** For the **existing** logs and todos DBs we can keep current behavior (implicit in tools + prompt). For **dynamic** DBs (user-added, or page/block creation), schema comes from the metadata-backed cache and the strategy above. That way "each prompt we have to send up to date schema" is avoided: we send a compact, cached summary once per session and optionally on demand via a tool.
+**Fixed vs dynamic:** For the **existing** logs and todos DBs we can keep current behavior (implicit in tools + prompt). For **dynamic** DBs (user-added, or page/block creation), schema comes from the metadata-backed cache and the strategy above. That way "each prompt we have to send up-to-date schema" is avoided: we send a compact, cached summary once per session and optionally on demand via a tool.
 
 **Port surface:** Extend `IMetadataStore` with getCachedSchema/setCachedSchema only. Keep the port minimal:
 

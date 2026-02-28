@@ -42,7 +42,7 @@ Work through each area systematically, marking them as in_progress and completed
 ### Phase 3: Provide Feedback
 
 Format your feedback clearly:
-```
+```markdown
 ## Summary
 [High-level overview of the review - what's good, what needs attention]
 

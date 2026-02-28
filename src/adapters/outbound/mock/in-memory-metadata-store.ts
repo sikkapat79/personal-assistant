@@ -24,11 +24,11 @@ export class InMemoryMetadataStore implements IMetadataStore {
     let list = this.provenance;
     if (filter?.type) list = list.filter((e) => e.type === filter.type);
     if (filter?.parentId !== undefined) list = list.filter((e) => e.parentId === filter.parentId);
-    return list;
+    return structuredClone(list);
   }
 
   getAllowedNotionScope(): AllowedNotionScope | null {
-    return this.scope;
+    return this.scope ? structuredClone(this.scope) : null;
   }
 
   async setAllowedNotionScope(scope: AllowedNotionScope): Promise<void> {
@@ -36,7 +36,8 @@ export class InMemoryMetadataStore implements IMetadataStore {
   }
 
   async getSyncState(key: string): Promise<SyncState | null> {
-    return this.sync[key] ?? null;
+    const state = this.sync[key];
+    return state ? structuredClone(state) : null;
   }
 
   async setSyncState(key: string, state: SyncState): Promise<void> {
@@ -44,7 +45,8 @@ export class InMemoryMetadataStore implements IMetadataStore {
   }
 
   async getCachedSchema(databaseId: string): Promise<DatabaseSchema | null> {
-    return this.schemas[databaseId] ?? null;
+    const schema = this.schemas[databaseId];
+    return schema ? structuredClone(schema) : null;
   }
 
   async setCachedSchema(databaseId: string, schema: DatabaseSchema): Promise<void> {
