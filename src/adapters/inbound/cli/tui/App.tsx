@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TextAttributes } from '@opentui/core';
-import { useKeyboard, useRenderer } from '@opentui/react';
+import { useKeyboard, useRenderer, useAppContext } from '@opentui/react';
 import { designTokens } from '../../../../design-tokens';
 import { getResolvedConfig, hasRequiredConfig } from '../../../../config/resolved';
 import { useAgent } from './useAgent';
@@ -11,6 +11,12 @@ import { todayLogDate, createLogDate } from '../../../../domain/value-objects/lo
 import type { DailyLog } from '../../../../domain/entities/daily-log';
 import type { TodoItemDto } from '../../../../application/dto/todo-dto';
 import type { Composition } from '../../../../composition';
+import { saveSettings, loadSettings } from '../../../../config/settings';
+import { saveProfile } from '../../../../config/profile';
+import { SETUP_STEPS } from './constants/setup';
+import { SettingsPageContent } from './SettingsPageContent';
+import { FirstRunSetupContent } from './FirstRunSetupContent';
+import type { Page } from './types';
 import { TodayLogSection } from './TodayLogSection';
 import { TasksSection } from './TasksSection';
 import { ChatSection } from './ChatSection';
@@ -49,6 +55,14 @@ export function App({ composeFn }: AppProps) {
   const [tasksScrollOffset, setTasksScrollOffset] = useState(0);
   const [chatScrollOffset, setChatScrollOffset] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+
+  // Page navigation
+  const [page, setPage] = useState<Page>('main');
+  const [displayNameInput, setDisplayNameInput] = useState(resolved.profile.displayName);
+  const [savedDisplayName, setSavedDisplayName] = useState(resolved.profile.displayName);
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'setup'>('profile');
+  const [setupStep, setSetupStep] = useState(0);
+  const [setupInput, setSetupInput] = useState('');
 
   const spinThinking = useSpinner(thinking);
 
@@ -215,9 +229,94 @@ export function App({ composeFn }: AppProps) {
     focusedSectionRef.current = focusedSection;
   }, [focusedSection]);
 
+  // Paste support (bracketed paste via @opentui/core paste event)
+  const { keyHandler } = useAppContext();
+  useEffect(() => {
+    if (!keyHandler) return;
+    const handler = (event: { text: string }) => {
+      const text = event.text.replace(/[^\x20-\x7E]/g, '');
+      if (!text) return;
+      if (page === 'settings') {
+        if (settingsTab === 'profile') setDisplayNameInput(s => s + text);
+        if (settingsTab === 'setup') setSetupInput(s => s + text);
+      } else if (!hasRequiredConfig()) {
+        setSetupInput(s => s + text);
+      }
+    };
+    keyHandler.on('paste', handler);
+    return () => { keyHandler.off('paste', handler); };
+  }, [keyHandler, page, settingsTab]);
+
   // Keyboard handling
   useKeyboard((key) => {
     const isWideScreen = terminalSize.width >= 100;
+
+    // Helper - filters key.sequence to printable ASCII chars only
+    function printableInput(k: { ctrl?: boolean; meta?: boolean; sequence?: string }): string {
+      if (k.ctrl || k.meta) return '';
+      return (k.sequence ?? '').replace(/[^\x20-\x7E]/g, '');
+    }
+
+    // Settings page input
+    if (page === 'settings') {
+      if (key.ctrl && key.name === 'c') { clearConsole(); renderer.destroy(); process.exit(0); }
+      if ((key.ctrl && key.name === 'p') || key.name === 'escape') { setPage('main'); return; }
+      if (key.name === 'tab') {
+        if (settingsTab === 'profile') { setSetupStep(0); setSetupInput(''); setSettingsTab('setup'); }
+        else setSettingsTab('profile');
+        return;
+      }
+
+      if (settingsTab === 'profile') {
+        if (key.name === 'return') { saveProfile({ displayName: displayNameInput }); setSavedDisplayName(displayNameInput); return; }
+        if (key.name === 'backspace' || key.name === 'delete') { setDisplayNameInput(s => s.slice(0, -1)); return; }
+        const ch = printableInput(key);
+        if (ch) setDisplayNameInput(s => s + ch);
+        return;
+      }
+
+      if (settingsTab === 'setup') {
+        if (key.name === 'return' || key.name === 'escape') {
+          if (key.name === 'return' && setupInput.trim()) {
+            const current = loadSettings();
+            saveSettings({ ...current, [SETUP_STEPS[setupStep].key]: setupInput.trim() });
+          }
+          const nextStep = setupStep + 1;
+          if (nextStep >= SETUP_STEPS.length) {
+            setSetupStep(0); setSetupInput(''); setSettingsTab('profile');
+          } else {
+            setSetupStep(nextStep); setSetupInput('');
+          }
+          return;
+        }
+        if (key.name === 'backspace' || key.name === 'delete') { setSetupInput(s => s.slice(0, -1)); return; }
+        const ch = printableInput(key);
+        if (ch) setSetupInput(s => s + ch);
+        return;
+      }
+    }
+
+    // No-config wizard keyboard handling
+    if (!hasRequiredConfig()) {
+      if (key.ctrl && key.name === 'c') { clearConsole(); renderer.destroy(); process.exit(0); }
+      if (key.name === 'return' || key.name === 'escape') {
+        if (key.name === 'return' && setupInput.trim()) {
+          const current = loadSettings();
+          saveSettings({ ...current, [SETUP_STEPS[setupStep].key]: setupInput.trim() });
+        }
+        const nextStep = setupStep + 1;
+        if (nextStep >= SETUP_STEPS.length) {
+          setSetupStep(0); setSetupInput('');
+        } else {
+          setSetupStep(nextStep); setSetupInput('');
+        }
+        return;
+      }
+      if (key.name === 'backspace' || key.name === 'delete') { setSetupInput(s => s.slice(0, -1)); return; }
+      const ch = printableInput(key);
+      if (ch) setSetupInput(s => s + ch);
+      return;
+    }
 
     // Help modal - ? key toggles, any key closes when open
     if (showHelp) {
@@ -227,6 +326,14 @@ export function App({ composeFn }: AppProps) {
     // Check for ? (works with or without shift flag)
     if (key.sequence === '?' || (key.name === '/' && key.shift)) {
       setShowHelp(true);
+      return;
+    }
+
+    if (key.ctrl && key.name === 'p') {
+      setDisplayNameInput(resolved.profile.displayName);
+      setSavedDisplayName(resolved.profile.displayName);
+      setSettingsTab('profile');
+      setPage('settings');
       return;
     }
 
@@ -333,6 +440,20 @@ export function App({ composeFn }: AppProps) {
     );
   }
 
+  if (page === 'settings') {
+    return (
+      <SettingsPageContent
+        displayNameInput={displayNameInput}
+        setDisplayNameInput={setDisplayNameInput}
+        savedDisplayName={savedDisplayName}
+        settingsTab={settingsTab}
+        setupStep={setupStep}
+        setupInput={setupInput}
+        resolved={resolved}
+      />
+    );
+  }
+
   // Handle errors
   if (error) {
     return (
@@ -346,16 +467,7 @@ export function App({ composeFn }: AppProps) {
   }
 
   if (!hasRequiredConfig()) {
-    return (
-      <box style={{ flexDirection: 'column', padding: 1 }}>
-        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
-          Configuration required
-        </text>
-        <text fg={designTokens.color.muted}>
-          Set NOTION_API_KEY, NOTION_LOGS_DATABASE_ID, NOTION_TODOS_DATABASE_ID
-        </text>
-      </box>
-    );
+    return <FirstRunSetupContent setupStep={setupStep} setupInput={setupInput} />;
   }
 
   // Determine layout mode based on width
@@ -414,8 +526,8 @@ export function App({ composeFn }: AppProps) {
           <text fg={designTokens.color.muted}>
             {truncateText(
               focusedSection !== 'chat'
-                ? '↑↓: scroll | Tab: switch | ?: help | Ctrl+C: exit'
-                : '↑↓: scroll | Tab: switch | ?: help | Ctrl+C: exit',
+                ? '↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit'
+                : '↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit',
               topbarContentWidth
             )}
           </text>
@@ -478,7 +590,7 @@ export function App({ composeFn }: AppProps) {
       {/* Footer */}
       <box>
         <text fg={designTokens.color.muted}>
-          {truncateText('↑↓: scroll | Tab: switch | ?: help | Ctrl+C: exit', chatContentWidth)}
+          {truncateText('↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit', chatContentWidth)}
         </text>
       </box>
 
