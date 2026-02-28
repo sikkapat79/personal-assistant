@@ -484,18 +484,8 @@ export function App({ composeFn }: AppProps) {
     );
   }
 
-  // Handle errors
-  if (error) {
-    return (
-      <box style={{ flexDirection: 'column', padding: 1 }}>
-        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
-          Could not start
-        </text>
-        <text fg={designTokens.color.error}>{truncateText(error, terminalSize.width - 4)}</text>
-      </box>
-    );
-  }
-
+  // First-run wizard before error: when config is missing, compose() throws and sets error,
+  // but we must show the wizard so the user can enter credentials (not "Could not start").
   if (!hasRequiredConfig() || setupStep >= SETUP_STEPS.length) {
     return (
       <FirstRunSetupContent
@@ -505,6 +495,18 @@ export function App({ composeFn }: AppProps) {
         settings={setupStep >= SETUP_STEPS.length ? loadSettings() : undefined}
         displayName={setupStep >= SETUP_STEPS.length ? resolved.profile.displayName : undefined}
       />
+    );
+  }
+
+  // Handle errors (only when config is present; missing-config case is handled by wizard above)
+  if (error) {
+    return (
+      <box style={{ flexDirection: 'column', padding: 1 }}>
+        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
+          Could not start
+        </text>
+        <text fg={designTokens.color.error}>{truncateText(error, terminalSize.width - 4)}</text>
+      </box>
     );
   }
 

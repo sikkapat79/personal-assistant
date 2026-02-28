@@ -54,6 +54,8 @@ function sanitizeLog(log: DailyLog | null): DailyLog | null {
     date: log.date,
     content: {
       ...log.content,
+      // Sanitize title so fixtures don't expose personal/project identifiers
+      title: log.content.title ? 'Daily log entry' : '',
       // Replace notes with placeholder (preserve presence)
       notes: log.content.notes
         ? PLACEHOLDER_NOTES[Math.floor(Math.random() * PLACEHOLDER_NOTES.length)]
@@ -62,7 +64,7 @@ function sanitizeLog(log: DailyLog | null): DailyLog | null {
       gratitude: log.content.gratitude
         ? PLACEHOLDER_GRATITUDE[Math.floor(Math.random() * PLACEHOLDER_GRATITUDE.length)]
         : undefined,
-      // Keep title and numeric values as-is (no personal info)
+      // Numeric values (mood, energy, score, etc.) kept as-is (no personal info)
     },
   };
 }
