@@ -376,6 +376,14 @@ export function App({ composeFn }: AppProps) {
       return;
     }
 
+    // Global exit - must run before focus-specific handlers so Ctrl+C always works
+    if (key.ctrl && key.name === 'c') {
+      clearConsole();
+      renderer.destroy();
+      process.exit(0);
+      return;
+    }
+
     // Handle scroll keys for log, tasks, and chat sections
     if (focusedSectionRef.current === 'log') {
       if (key.name === 'up') {
@@ -423,13 +431,6 @@ export function App({ composeFn }: AppProps) {
 
     if (key.name === 'return') {
       submit();
-      return;
-    }
-
-    if (key.ctrl && key.name === 'c') {
-      clearConsole();
-      renderer.destroy();
-      process.exit(0);
       return;
     }
 
