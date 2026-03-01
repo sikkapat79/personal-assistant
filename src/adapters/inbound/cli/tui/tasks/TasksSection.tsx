@@ -2,7 +2,7 @@ import React from 'react';
 import { TextAttributes } from '@opentui/core';
 import { designTokens } from '../../../../../design-tokens';
 import { truncateText, wrapText } from '../utils/wrapText';
-import { useTuiState } from '../context/TuiStateContext';
+import { useTuiStore } from '../store/tuiStore';
 
 interface TasksSectionProps {
   contentWidth: number;
@@ -13,7 +13,10 @@ export function TasksSection({
   contentWidth,
   maxVisibleItems = 5
 }: TasksSectionProps) {
-  const { tasks, loadingTasks, tasksScrollOffset, focusedSection } = useTuiState();
+  const tasks = useTuiStore((s) => s.tasks);
+  const loadingTasks = useTuiStore((s) => s.loadingTasks);
+  const tasksScrollOffset = useTuiStore((s) => s.tasksScrollOffset);
+  const focusedSection = useTuiStore((s) => s.focusedSection);
   const focused = focusedSection === 'tasks';
 
   // Convert all tasks to wrapped lines

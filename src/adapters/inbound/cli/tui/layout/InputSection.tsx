@@ -1,12 +1,12 @@
 import React from 'react';
-import { useTuiState } from '../context/TuiStateContext';
+import { useTuiStore } from '../store/tuiStore';
 
 interface InputSectionProps {
   maxLines?: number;
 }
 
 export function InputSection({ maxLines = 3 }: InputSectionProps) {
-  const { input } = useTuiState();
+  const input = useTuiStore((s) => s.input);
 
   // Show full input without truncation (wraps if needed)
   const displayText = input.length > 0 ? `> ${input}▌` : '> ▌';

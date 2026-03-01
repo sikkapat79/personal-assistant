@@ -3,7 +3,7 @@ import { TextAttributes } from '@opentui/core';
 import { designTokens } from '../../../../../design-tokens';
 import { truncateText, wrapText } from '../utils/wrapText';
 import { AGENT_NAME } from '../../../../../config/branding';
-import { useTuiState } from '../context/TuiStateContext';
+import { useTuiStore } from '../store/tuiStore';
 
 interface ChatSectionProps {
   contentWidth: number;
@@ -14,7 +14,11 @@ export function ChatSection({
   contentWidth,
   maxVisibleMessages = 15
 }: ChatSectionProps) {
-  const { history, thinking, spinThinking, chatScrollOffset, focusedSection } = useTuiState();
+  const history = useTuiStore((s) => s.history);
+  const thinking = useTuiStore((s) => s.thinking);
+  const spinThinking = useTuiStore((s) => s.spinThinking);
+  const chatScrollOffset = useTuiStore((s) => s.chatScrollOffset);
+  const focusedSection = useTuiStore((s) => s.focusedSection);
   const focused = focusedSection === 'chat';
 
   // Convert all messages to wrapped lines

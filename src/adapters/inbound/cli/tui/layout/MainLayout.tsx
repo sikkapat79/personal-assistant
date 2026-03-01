@@ -1,7 +1,7 @@
 import React from 'react';
 import { designTokens } from '../../../../../design-tokens';
 import { truncateText } from '../utils/wrapText';
-import { useTuiState } from '../context/TuiStateContext';
+import { useTuiStore } from '../store/tuiStore';
 import { TopbarSection } from '../log/TopbarSection';
 import { ChatSection } from '../chat/ChatSection';
 import { TasksSection } from '../tasks/TasksSection';
@@ -9,7 +9,8 @@ import { InputSection } from './InputSection';
 import { HelpModal } from './HelpModal';
 
 export function MainLayout() {
-  const { terminalSize, showHelp } = useTuiState();
+  const terminalSize = useTuiStore((s) => s.terminalSize);
+  const showHelp = useTuiStore((s) => s.showHelp);
   const isWideScreen = terminalSize.width >= 100;
   const availableWidth = terminalSize.width - 2;
   const chatColumnWidth = Math.floor(availableWidth * (isWideScreen ? 0.62 : 0.6));

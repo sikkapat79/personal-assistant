@@ -2,14 +2,15 @@ import React from 'react';
 import { designTokens } from '../../../../../design-tokens';
 import { truncateText } from '../utils/wrapText';
 import { energyBarSegments } from './energyBarSegments';
-import { useTuiState } from '../context/TuiStateContext';
+import { useTuiStore } from '../store/tuiStore';
 
 interface TopbarSectionProps {
   contentWidth: number;
 }
 
 export function TopbarSection({ contentWidth }: TopbarSectionProps) {
-  const { todayLog, loadingLog } = useTuiState();
+  const todayLog = useTuiStore((s) => s.todayLog);
+  const loadingLog = useTuiStore((s) => s.loadingLog);
 
   if (loadingLog) {
     return (
