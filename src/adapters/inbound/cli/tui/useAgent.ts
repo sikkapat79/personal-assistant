@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { compose } from '../../../../composition';
+import type { Composition } from '../../../../composition';
 
-export function useAgent() {
+export function useAgent(composeFn: () => Promise<Composition> = compose) {
   const [state, setState] = useState<{
-    composition: Awaited<ReturnType<typeof compose>> | null;
+    composition: Composition | null;
     error: string | null;
   }>({ composition: null, error: null });
 
   useEffect(() => {
     let cancelled = false;
-    compose()
+    composeFn()
       .then((composition) => {
         if (!cancelled) setState({ composition, error: null });
       })
@@ -19,7 +20,7 @@ export function useAgent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [composeFn]);
 
   if (state.error)
     return { agent: null, logs: null, todos: null, logUseCase: null, error: state.error };
