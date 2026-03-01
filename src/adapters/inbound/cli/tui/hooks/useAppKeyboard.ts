@@ -247,9 +247,8 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
     }
 
     if (key.name === 'return') {
-      void submitRef.current?.()?.catch((err) => {
-        console.error('Failed to submit chat input:', err);
-      });
+      const fn = submitRef.current;
+      if (fn) void fn().catch((err) => console.error('Failed to submit chat input:', err));
       return;
     }
 
