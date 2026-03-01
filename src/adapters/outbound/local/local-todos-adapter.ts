@@ -38,7 +38,7 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
   }
 
   async add(todo: Todo): Promise<Todo> {
-    const localId = crypto.randomUUID();
+    const localId = Bun.randomUUIDv7();
     const payload: TodoCreatedPayload = {
       title: String(todo.title),
       dueDate: todo.dueDate ?? null,
@@ -49,7 +49,9 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
     };
     this.write(localId, EventType.TodoCreated, payload);
     // Return the todo with the local UUID as its id
-    return this.projection.todos.get(localId) ?? todo;
+    const stored = this.projection.todos.get(localId);
+    if (!stored) throw new Error(`[LocalTodosAdapter] projection missing todo after write — handler not registered`);
+    return stored;
   }
 
   async complete(id: TodoId): Promise<void> {

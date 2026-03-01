@@ -14,7 +14,7 @@ export abstract class LocalAdapterBase {
 
   protected write(entityId: string, eventType: EventType, payload: EventPayload): StoredEvent {
     const event: StoredEvent = {
-      id: crypto.randomUUID(),
+      id: Bun.randomUUIDv7(),
       entity_type: this.entityType,
       entity_id: entityId,
       event_type: eventType,

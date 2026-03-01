@@ -114,6 +114,8 @@ export class SyncEngine {
   ): Promise<string | null> {
     try {
       if (entityType === EntityType.DailyLog) {
+        // findByDate returns null when the log doesn't exist in Notion yet.
+        // Returning null forces the event to be applied — correct default for new logs.
         const log = await this.notionLogs.findByDate(notionId);
         if (!log?.id) return null;
         return await this.notionLogs.fetchLastEditedTime(log.id);

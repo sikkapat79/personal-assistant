@@ -69,14 +69,14 @@ export class BunSqliteEventQueue implements IEventQueue {
   }
 
   pendingSync(): StoredEvent[] {
-    // Timestamps are ISO 8601 with millisecond precision from new Date().toISOString().
-    // Lexicographic ORDER BY is correct as long as all timestamps share the same precision —
-    // which holds because every insert path goes through LocalAdapterBase.write().
+    // Event ids are UUID v7 — lexicographic order equals creation order.
+    // Sorting by id gives deterministic replay even for events created within
+    // the same millisecond (where timestamp alone would be a tie).
     const stmt = this.db.prepare(
       `SELECT id, entity_type, entity_id, event_type, payload, timestamp, device_id, synced
        FROM events
        WHERE synced = 0
-       ORDER BY timestamp ASC`
+       ORDER BY id ASC`
     );
     const rows = stmt.all() as EventRow[];
     return rows.map(rowToStoredEvent);
@@ -128,6 +128,25 @@ export class BunSqliteEventQueue implements IEventQueue {
       }
       for (const log of logs) {
         insertLog.run(log.date, JSON.stringify(log), now);
+      }
+
+      // Prune rows that no longer exist in Notion
+      if (todos.length === 0) {
+        this.db.exec('DELETE FROM snapshot_todos');
+      } else {
+        const placeholders = todos.map(() => '?').join(', ');
+        this.db
+          .prepare(`DELETE FROM snapshot_todos WHERE notion_id NOT IN (${placeholders})`)
+          .run(...todos.map((t) => t.id));
+      }
+
+      if (logs.length === 0) {
+        this.db.exec('DELETE FROM snapshot_logs');
+      } else {
+        const placeholders = logs.map(() => '?').join(', ');
+        this.db
+          .prepare(`DELETE FROM snapshot_logs WHERE date NOT IN (${placeholders})`)
+          .run(...logs.map((l) => l.date));
       }
     });
 

@@ -22,10 +22,16 @@ export async function hydrateFromNotion(
   const from = dayjs().subtract(HYDRATION_LOOKBACK_DAYS, 'day').format('YYYY-MM-DD');
   const to = dayjs().format('YYYY-MM-DD');
 
-  const [todos, logs] = await Promise.all([
-    notionTodos.listAll(),
-    notionLogs.findByDateRange(from, to),
-  ]);
+  let todos, logs;
+  try {
+    [todos, logs] = await Promise.all([
+      notionTodos.listAll(),
+      notionLogs.findByDateRange(from, to),
+    ]);
+  } catch (err) {
+    console.error('[hydration] Failed to fetch from Notion:', err instanceof Error ? err.message : String(err));
+    return; // App continues with existing local snapshot
+  }
 
   queue.saveSnapshot(todos, logs);
 
