@@ -1,7 +1,7 @@
 import { TextAttributes } from '@opentui/core';
-import { getColumnPurpose } from '../../../../adapters/outbound/notion/client';
-import { designTokens } from '../../../../design-tokens';
-import type { ColumnSuggestionRow } from './types';
+import { getColumnPurpose } from '../../../../../adapters/outbound/notion/client';
+import { designTokens } from '../../../../../design-tokens';
+import type { ColumnSuggestionRow } from '../types';
 
 export function ColumnMappingContent({
   row,

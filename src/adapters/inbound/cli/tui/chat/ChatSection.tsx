@@ -1,28 +1,22 @@
 import React from 'react';
 import { TextAttributes } from '@opentui/core';
-import { designTokens } from '../../../../design-tokens';
-import { truncateText, wrapText } from './wrapText';
-import { AGENT_NAME } from '../../../../config/branding';
+import { designTokens } from '../../../../../design-tokens';
+import { truncateText, wrapText } from '../utils/wrapText';
+import { AGENT_NAME } from '../../../../../config/branding';
+import { useTuiState } from '../context/TuiStateContext';
 
 interface ChatSectionProps {
-  history: { role: 'user' | 'assistant'; content: string }[];
-  thinking: boolean;
-  spinThinking: string;
-  focused: boolean;
   contentWidth: number;
-  scrollOffset: number;
   maxVisibleMessages?: number;
 }
 
 export function ChatSection({
-  history,
-  thinking,
-  spinThinking,
-  focused,
   contentWidth,
-  scrollOffset,
   maxVisibleMessages = 15
 }: ChatSectionProps) {
+  const { history, thinking, spinThinking, chatScrollOffset, focusedSection } = useTuiState();
+  const focused = focusedSection === 'chat';
+
   // Convert all messages to wrapped lines
   const allLines: Array<{ role: 'user' | 'assistant'; text: string; lineIndex: number; msgIndex: number }> = [];
 
@@ -47,11 +41,11 @@ export function ChatSection({
   }
 
   const totalLines = allLines.length;
-  const hasMore = totalLines > scrollOffset + maxVisibleMessages;
-  const hasAbove = scrollOffset > 0;
+  const hasMore = totalLines > chatScrollOffset + maxVisibleMessages;
+  const hasAbove = chatScrollOffset > 0;
 
   // Show lines in view window
-  const visibleLines = allLines.slice(scrollOffset, scrollOffset + maxVisibleMessages);
+  const visibleLines = allLines.slice(chatScrollOffset, chatScrollOffset + maxVisibleMessages);
 
   return (
     <box style={{ flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>

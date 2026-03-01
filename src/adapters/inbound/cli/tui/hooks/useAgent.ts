@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { compose } from '../../../../composition';
-import type { Composition } from '../../../../composition';
+import { compose } from '../../../../../composition';
+import type { Composition } from '../../../../../composition';
 
 export function useAgent(composeFn: () => Promise<Composition> = compose) {
   const [state, setState] = useState<{

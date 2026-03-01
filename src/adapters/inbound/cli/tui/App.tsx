@@ -1,12 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { TextAttributes } from '@opentui/core';
 import { useKeyboard, useRenderer, useAppContext } from '@opentui/react';
-import { designTokens } from '../../../../design-tokens';
 import { getResolvedConfig, hasRequiredConfig } from '../../../../config/resolved';
-import { useAgent } from './useAgent';
-import { useSpinner } from './useSpinner';
-import { truncateText, calculateChatLineCount, wrapText } from './wrapText';
-import { clearConsole } from './clearConsole';
+import { useAgent } from './hooks/useAgent';
+import { useSpinner } from './hooks/useSpinner';
+import { truncateText, calculateChatLineCount, wrapText } from './utils/wrapText';
+import { clearConsole } from './utils/clearConsole';
 import { todayLogDate, createLogDate } from '../../../../domain/value-objects/log-date';
 import type { DailyLog } from '../../../../domain/entities/daily-log';
 import type { TodoItemDto } from '../../../../application/dto/todo-dto';
@@ -14,14 +12,13 @@ import type { Composition } from '../../../../composition';
 import { saveSettings, loadSettings } from '../../../../config/settings';
 import { saveProfile } from '../../../../config/profile';
 import { SETUP_STEPS, SETTINGS_STEPS } from './constants/setup';
-import { SettingsPageContent } from './SettingsPageContent';
-import { FirstRunSetupContent } from './FirstRunSetupContent';
+import { SettingsPageContent } from './settings/SettingsPageContent';
+import { FirstRunSetupContent } from './settings/FirstRunSetupContent';
 import type { Page } from './types';
-import { TasksSection } from './TasksSection';
-import { ChatSection } from './ChatSection';
-import { InputSection } from './InputSection';
-import { TopbarSection } from './TopbarSection';
-import { HelpModal } from './HelpModal';
+import { TuiStateContext } from './context/TuiStateContext';
+import { TerminalTooSmallScreen } from './layout/TerminalTooSmallScreen';
+import { StartupErrorScreen } from './layout/StartupErrorScreen';
+import { MainLayout } from './layout/MainLayout';
 
 interface AppProps {
   composeFn?: () => Promise<Composition>;
@@ -50,8 +47,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
   const [loadingLog, setLoadingLog] = useState(true);
   const [tasks, setTasks] = useState<TodoItemDto[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
-  const [focusedSection, setFocusedSection] = useState<'log' | 'tasks' | 'chat'>('chat');
-  const [logScrollOffset, setLogScrollOffset] = useState(0);
+  const [focusedSection, setFocusedSection] = useState<'tasks' | 'chat'>('chat');
   const [tasksScrollOffset, setTasksScrollOffset] = useState(0);
   const [chatScrollOffset, setChatScrollOffset] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
@@ -68,32 +64,6 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
   const [apiKeysEditInput, setApiKeysEditInput] = useState('');
 
   const spinThinking = useSpinner(thinking);
-
-  // Calculate max scroll offsets to prevent over-scrolling (matches TodayLogSection rendered lines)
-  const getMaxLogScroll = useCallback(() => {
-    if (!todayLog) return 0;
-    const availableWidth = terminalSize.width - 2;
-    const sidebarColumnWidth = availableWidth - Math.floor(availableWidth * 0.62);
-    const contentWidth = sidebarColumnWidth - 6;
-    const prefixLen = 3; // '💭 ' / '🙏 ' prefix length for notes and gratitude
-    let lineCount = 1; // title
-    if (todayLog.content.mood !== undefined || todayLog.content.energy !== undefined) {
-      lineCount += 1; // metrics line
-      if (todayLog.content.energy !== undefined) lineCount += 1; // energy bar
-    }
-    if (todayLog.content.notes)
-      lineCount += wrapText(todayLog.content.notes, contentWidth - prefixLen).length;
-    if (
-      todayLog.content.workout !== undefined ||
-      todayLog.content.diet !== undefined ||
-      todayLog.content.deepWorkHours !== undefined
-    )
-      lineCount += 1;
-    if (todayLog.content.gratitude)
-      lineCount += wrapText(todayLog.content.gratitude, contentWidth - prefixLen).length;
-    const maxVisibleLines = 4; // 2-column wide layout
-    return Math.max(0, lineCount - maxVisibleLines);
-  }, [todayLog, terminalSize.width]);
 
   const getMaxTasksScroll = useCallback(() => {
     const isWideScreen = terminalSize.width >= 100;
@@ -146,11 +116,6 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
   useEffect(() => {
     fetchTodayLog();
   }, [fetchTodayLog]);
-
-  // Reset log scroll when log changes
-  useEffect(() => {
-    setLogScrollOffset(0);
-  }, [todayLog]);
 
   // Fetch open tasks
   const fetchTasks = useCallback(async (showLoading = false) => {
@@ -423,20 +388,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
       return;
     }
 
-    // Handle scroll keys for log, tasks, and chat sections
-    if (focusedSectionRef.current === 'log') {
-      if (key.name === 'up') {
-        setLogScrollOffset((offset) => Math.max(0, offset - 1));
-        return;
-      }
-      if (key.name === 'down') {
-        const maxScroll = getMaxLogScroll();
-        setLogScrollOffset((offset) => Math.min(maxScroll, offset + 1));
-        return;
-      }
-      return; // Don't handle other keys
-    }
-
+    // Handle scroll keys for tasks and chat sections
     if (focusedSectionRef.current === 'tasks') {
       if (key.name === 'up') {
         setTasksScrollOffset((offset) => Math.max(0, offset - 1));
@@ -484,21 +436,33 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
     }
   });
 
-  // Check minimum size
+  const contextValue = {
+    terminalSize,
+    focusedSection,
+    showHelp,
+    input,
+    history,
+    thinking,
+    spinThinking,
+    chatScrollOffset,
+    tasks,
+    loadingTasks,
+    tasksScrollOffset,
+    todayLog,
+    loadingLog,
+  };
+
   const minWidth = 80;
   const minHeight = 20;
 
   if (terminalSize.width < minWidth || terminalSize.height < minHeight) {
     return (
-      <box style={{ flexDirection: 'column', padding: 1 }}>
-        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
-          Terminal too small
-        </text>
-        <text fg={designTokens.color.muted}>
-          Minimum: {minWidth}×{minHeight}, Current: {terminalSize.width}×{terminalSize.height}
-        </text>
-        <text fg={designTokens.color.muted}>Please resize your terminal.</text>
-      </box>
+      <TerminalTooSmallScreen
+        minWidth={minWidth}
+        minHeight={minHeight}
+        currentWidth={terminalSize.width}
+        currentHeight={terminalSize.height}
+      />
     );
   }
 
@@ -540,135 +504,12 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
 
   // Handle errors (only when config is present; missing-config case is handled by wizard above)
   if (error) {
-    return (
-      <box style={{ flexDirection: 'column', padding: 1 }}>
-        <text fg={designTokens.color.error} style={{ attributes: TextAttributes.BOLD }}>
-          Could not start
-        </text>
-        <text fg={designTokens.color.error}>{truncateText(error, terminalSize.width - 4)}</text>
-      </box>
-    );
+    return <StartupErrorScreen error={error} terminalWidth={terminalSize.width} />;
   }
-
-  // Determine layout mode based on width
-  const isWideScreen = terminalSize.width >= 100;
-  const totalWidth = terminalSize.width;
-
-  // Calculate input box height based on terminal size
-  const inputMaxLines = terminalSize.height < 25 ? 2 : 3;
-
-  // Small screen layout (< 100 width)
-  if (!isWideScreen) {
-    const availableWidth = totalWidth - 2; // Account for parent padding
-    const chatColumnWidth = Math.floor(availableWidth * 0.6); // 60%
-    const tasksColumnWidth = availableWidth - chatColumnWidth; // 40%
-    const chatContentWidth = chatColumnWidth - 6;
-    const tasksContentWidth = tasksColumnWidth - 6;
-    const topbarContentWidth = totalWidth - 6;
-
-    return (
-      <box style={{ flexDirection: 'column', padding: 1, overflow: 'hidden', height: '100%' }}>
-        {/* Topbar - Compact Metrics */}
-        <TopbarSection todayLog={todayLog} loading={loadingLog} contentWidth={topbarContentWidth} />
-
-        {/* Two Columns: Chat (60%) + Tasks (40%) - grows to fill space */}
-        <box style={{ flexDirection: 'row', overflow: 'hidden', flexGrow: 1 }}>
-          {/* Left Column - Chat */}
-          <box style={{ flexDirection: 'column', width: chatColumnWidth, overflow: 'hidden' }}>
-            <ChatSection
-              history={history}
-              thinking={thinking}
-              spinThinking={spinThinking}
-              focused={focusedSection === 'chat'}
-              contentWidth={chatContentWidth}
-              scrollOffset={chatScrollOffset}
-            />
-          </box>
-
-          {/* Right Column - Tasks */}
-          <box style={{ flexDirection: 'column', width: tasksColumnWidth, overflow: 'hidden' }}>
-            <TasksSection
-              tasks={tasks}
-              loading={loadingTasks}
-              focused={focusedSection === 'tasks'}
-              contentWidth={tasksContentWidth}
-              scrollOffset={tasksScrollOffset}
-              maxVisibleItems={10}
-            />
-          </box>
-        </box>
-
-        {/* Input - Pinned at bottom */}
-        <InputSection input={input} maxLines={inputMaxLines} />
-
-        {/* Footer */}
-        <box>
-          <text fg={designTokens.color.muted}>
-            {truncateText(
-              '↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit',
-              topbarContentWidth
-            )}
-          </text>
-        </box>
-
-        {/* Help Modal */}
-        {showHelp && <HelpModal />}
-      </box>
-    );
-  }
-
-  // Wide screen layout (≥ 100 width) - Golden ratio
-  const availableWidth = totalWidth - 2; // Account for parent padding
-  const chatColumnWidth = Math.floor(availableWidth * 0.62); // 62%
-  const sidebarColumnWidth = availableWidth - chatColumnWidth; // 38%
-  const chatContentWidth = chatColumnWidth - 6;
-  const sidebarContentWidth = sidebarColumnWidth - 6;
-  const topbarContentWidth = totalWidth - 6;
 
   return (
-    <box style={{ flexDirection: 'column', padding: 1, overflow: 'hidden', height: '100%' }}>
-      {/* Topbar - Compact Metrics (same position as small screen) */}
-      <TopbarSection todayLog={todayLog} loading={loadingLog} contentWidth={topbarContentWidth} />
-
-      {/* Main content row - grows to fill space */}
-      <box style={{ flexDirection: 'row', overflow: 'hidden', flexGrow: 1 }}>
-        {/* Left Column - Chat */}
-        <box style={{ flexDirection: 'column', width: chatColumnWidth, overflow: 'hidden' }}>
-          <ChatSection
-            history={history}
-            thinking={thinking}
-            spinThinking={spinThinking}
-            focused={focusedSection === 'chat'}
-            contentWidth={chatContentWidth}
-            scrollOffset={chatScrollOffset}
-          />
-        </box>
-
-        {/* Right Column - Sidebar (Tasks only; log is in top bar) */}
-        <box style={{ flexDirection: 'column', width: sidebarColumnWidth, overflow: 'hidden' }}>
-          <TasksSection
-            tasks={tasks}
-            loading={loadingTasks}
-            focused={focusedSection === 'tasks'}
-            contentWidth={sidebarContentWidth}
-            scrollOffset={tasksScrollOffset}
-            maxVisibleItems={8}
-          />
-        </box>
-      </box>
-
-      {/* Input - Pinned at bottom */}
-      <InputSection input={input} maxLines={inputMaxLines} />
-
-      {/* Footer */}
-      <box>
-        <text fg={designTokens.color.muted}>
-          {truncateText('↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit', chatContentWidth)}
-        </text>
-      </box>
-
-      {/* Help Modal */}
-      {showHelp && <HelpModal />}
-    </box>
+    <TuiStateContext.Provider value={contextValue}>
+      <MainLayout />
+    </TuiStateContext.Provider>
   );
 }

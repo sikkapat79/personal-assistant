@@ -1,5 +1,5 @@
 import { TextAttributes } from '@opentui/core';
-import { designTokens } from '../../../../design-tokens';
+import { designTokens } from '../../../../../design-tokens';
 
 export function ColumnScanningContent({ spinner }: { spinner: string }) {
   return (
