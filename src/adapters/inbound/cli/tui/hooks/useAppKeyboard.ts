@@ -257,9 +257,10 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
       return;
     }
 
-    // Regular character input
-    if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
-      useTuiStore.getState().setInput((s) => s + key.sequence);
+    // Regular character input (use printableInput for consistency with other handlers)
+    const ch = printableInput(key);
+    if (ch) {
+      useTuiStore.getState().setInput((s) => s + ch);
     }
   });
 }
