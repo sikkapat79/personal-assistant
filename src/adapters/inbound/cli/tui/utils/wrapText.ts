@@ -1,4 +1,4 @@
-import { AGENT_NAME } from '../../../../config/branding';
+import { AGENT_NAME } from '../../../../../config/branding';
 
 /**
  * Word-wrap text to fit within a specified width.

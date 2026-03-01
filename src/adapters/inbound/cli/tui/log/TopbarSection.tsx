@@ -1,17 +1,18 @@
 import React from 'react';
-import { designTokens } from '../../../../design-tokens';
-import { truncateText } from './wrapText';
+import { designTokens } from '../../../../../design-tokens';
+import { truncateText } from '../utils/wrapText';
 import { energyBarSegments } from './energyBarSegments';
-import type { DailyLog } from '../../../../domain/entities/daily-log';
+import { useTuiStore } from '../store/tuiStore';
 
 interface TopbarSectionProps {
-  todayLog: DailyLog | null;
-  loading: boolean;
   contentWidth: number;
 }
 
-export function TopbarSection({ todayLog, loading, contentWidth }: TopbarSectionProps) {
-  if (loading) {
+export function TopbarSection({ contentWidth }: TopbarSectionProps) {
+  const todayLog = useTuiStore((s) => s.todayLog);
+  const loadingLog = useTuiStore((s) => s.loadingLog);
+
+  if (loadingLog) {
     return (
       <box style={{ borderStyle: 'single', paddingLeft: 1, paddingRight: 1 }}>
         <text fg={designTokens.color.muted}>{truncateText('Loading...', contentWidth)}</text>

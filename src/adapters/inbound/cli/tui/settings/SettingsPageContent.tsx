@@ -1,8 +1,8 @@
 import { TextAttributes } from '@opentui/core';
-import { getResolvedConfig } from '../../../../config/resolved';
-import { designTokens } from '../../../../design-tokens';
-import { maskSecret } from './maskSecret';
-import { SETTINGS_STEPS, SECRET_KEYS } from './constants/setup';
+import { getResolvedConfig } from '../../../../../config/resolved';
+import { designTokens } from '../../../../../design-tokens';
+import { maskSecret } from '../utils/maskSecret';
+import { SETTINGS_STEPS, SECRET_KEYS } from '../constants/setup';
 
 export function SettingsPageContent({
   displayNameInput,

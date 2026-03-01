@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SPINNER_FRAMES, SPINNER_TICK_MS } from './constants/spinner';
+import { SPINNER_FRAMES, SPINNER_TICK_MS } from '../constants/spinner';
 
 export function useSpinner(active: boolean): string {
   const [frame, setFrame] = useState(0);

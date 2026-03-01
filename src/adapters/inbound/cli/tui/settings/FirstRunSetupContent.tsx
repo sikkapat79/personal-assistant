@@ -1,8 +1,8 @@
 import { TextAttributes } from '@opentui/core';
-import { designTokens } from '../../../../design-tokens';
-import { SETUP_STEPS, SECRET_KEYS } from './constants/setup';
-import { maskSecret } from './maskSecret';
-import type { Settings } from '../../../../config/settings';
+import { designTokens } from '../../../../../design-tokens';
+import { SETUP_STEPS, SECRET_KEYS } from '../constants/setup';
+import { maskSecret } from '../utils/maskSecret';
+import type { Settings } from '../../../../../config/settings';
 
 export function FirstRunSetupContent({
   setupStep,

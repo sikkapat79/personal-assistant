@@ -1,5 +1,5 @@
 import React from 'react';
-import { designTokens } from '../../../../design-tokens';
+import { designTokens } from '../../../../../design-tokens';
 import { Modal } from './Modal';
 
 export function HelpModal() {

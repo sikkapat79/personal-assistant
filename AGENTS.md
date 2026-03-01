@@ -18,12 +18,33 @@ Quick reference for AI agents working on this codebase.
 | **application/ports/** | Interfaces (ILogsRepository, ITodosRepository, etc.). |
 | **application/use-cases/** | Log, todos, agent orchestration. |
 | **adapters/inbound/cli/** | CLI entry (`index.ts`), interactive prompt, and TUI. |
-| **adapters/inbound/cli/tui/** | TUI module: `App.tsx` / `AppRoot.tsx`, hooks, small components, utils, `constants/`, `types.ts`. Entry is `tui-app.tsx` (renderer + mount only). |
+| **adapters/inbound/cli/tui/** | TUI module. `App.tsx` (164 lines) is a thin coordinator: mounts hooks, owns settings/page-nav state, renders a guarded router. State is managed by a flat Zustand store (`store/tuiStore.ts`). Feature subdirs: `chat/`, `tasks/`, `log/`, `settings/`, `layout/`, `hooks/`, `utils/`, `constants/`. Entry is `tui-app.tsx` (renderer + mount only). |
 | **adapters/outbound/notion/** | Notion API adapters. |
 | **config/** | Resolved config, profile, settings (e.g. `~/.pa/settings.json`). |
 | **composition/** | Wiring (e.g. `compose()`) for use-cases and adapters. |
 | **design-tokens/** | Shared TUI colours etc. |
 | **agent-context/** | Source of truth for **product behaviour** (logs, tasks). **For coding agents** (e.g. Cursor): land here to understand how Pax should behave; edit here to change behaviour without code changes. Loaded by the app into the runtime agent's prompt. **Not** for defining runtime agents or teammates—those live in application code. |
+
+## TUI Architecture
+
+The TUI layer (`src/adapters/inbound/cli/tui/`) uses a feature-based structure with a Zustand store for shared state.
+
+**State**: All display state lives in `store/tuiStore.ts` (flat Zustand store). Leaf components read via individual field selectors (`useTuiStore(s => s.field)`). Settings/page-nav state stays as local `useState` in `App.tsx` — it's never consumed by leaf components.
+
+**Hooks** (`hooks/`) write to the store directly and return only callbacks:
+- `useTerminalSize` — resize listener → writes `terminalSize`
+- `useChat` — input/history/thinking + `submit` → writes chat state
+- `useDataFetching` — log/tasks fetch + scroll effects → writes data state
+- `useAppKeyboard` — full keyboard handler (side-effect only, returns void)
+
+**App.tsx router pattern** (render order):
+1. `terminalSize` too small → `TerminalTooSmallScreen`
+2. `page === 'settings'` → `SettingsPageContent` ← must come before error check
+3. `!hasRequiredConfig()` → `FirstRunSetupContent` (first-run wizard)
+4. `error` → `StartupErrorScreen`
+5. → `<MainLayout />` (reads store directly, no props)
+
+**Adding state**: add field + action to `tuiStore.ts`, read via `useTuiStore(s => s.field)` in components. Do not add display state to `App.tsx` useState — that is reserved for settings/page-nav.
 
 ## Behaviour and data rules
 
