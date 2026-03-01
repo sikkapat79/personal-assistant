@@ -1,6 +1,7 @@
 import React from 'react';
 import { designTokens } from '../../../../../design-tokens';
 import { truncateText } from '../utils/wrapText';
+import { getTuiLayoutMetrics } from '../utils/layoutMetrics';
 import { useTuiStore } from '../store/tuiStore';
 import { TopbarSection } from '../log/TopbarSection';
 import { ChatSection } from '../chat/ChatSection';
@@ -11,14 +12,14 @@ import { HelpModal } from './HelpModal';
 export function MainLayout() {
   const terminalSize = useTuiStore((s) => s.terminalSize);
   const showHelp = useTuiStore((s) => s.showHelp);
-  const isWideScreen = terminalSize.width >= 100;
-  const availableWidth = terminalSize.width - 2;
-  const chatColumnWidth = Math.floor(availableWidth * (isWideScreen ? 0.62 : 0.6));
-  const rightColumnWidth = availableWidth - chatColumnWidth;
-  const chatContentWidth = chatColumnWidth - 6;
-  const topbarContentWidth = terminalSize.width - 6;
-  const inputMaxLines = terminalSize.height < 25 ? 2 : 3;
-  const maxTasksVisible = isWideScreen ? 8 : 10;
+  const {
+    chatColumnWidth,
+    rightColumnWidth,
+    chatContentWidth,
+    topbarContentWidth,
+    inputMaxLines,
+    maxTasksVisible,
+  } = getTuiLayoutMetrics(terminalSize);
 
   return (
     <box style={{ flexDirection: 'column', padding: 1, overflow: 'hidden', height: '100%' }}>

@@ -69,7 +69,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
       if (page === 'settings') {
         if (settingsTab === 'profile') setDisplayNameInput(s => s + text);
         if (settingsTab === 'api-keys' && apiKeysEditingIndex !== null) setApiKeysEditInput(s => s + text);
-      } else if (!hasRequiredConfig()) {
+      } else if (!hasRequiredConfig() || (setupStep > 0 && setupStep <= SETUP_STEPS.length)) {
         setSetupInput(s => s + text);
       } else {
         useTuiStore.getState().setInput(s => s + text);
@@ -77,7 +77,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
     };
     keyHandler.on('paste', handler);
     return () => { keyHandler.off('paste', handler); };
-  }, [keyHandler, page, settingsTab, apiKeysEditingIndex]);
+  }, [keyHandler, page, settingsTab, apiKeysEditingIndex, setupStep]);
 
   useAppKeyboard({
     page,

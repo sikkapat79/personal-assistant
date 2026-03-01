@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { todayLogDate, createLogDate } from '../../../../../domain/value-objects/log-date';
 import type { ILogsRepository } from '../../../../../application/ports/logs-repository';
 import { wrapText } from '../utils/wrapText';
+import { getTuiLayoutMetrics } from '../utils/layoutMetrics';
 import type { TodosUseCase } from '../../../../../application/use-cases/todos-use-case';
 import { useTuiStore } from '../store/tuiStore';
 
@@ -24,12 +25,11 @@ export function useDataFetching(
   const getMaxTasksScroll = useCallback(() => {
     // Read fresh from store to avoid stale closure (outer `tasks` is only for effect deps)
     const tasks = useTuiStore.getState().tasks;
-    const isWideScreen = terminalWidth >= 100;
-    const maxVisible = isWideScreen ? 8 : 10;
-    const availableWidth = terminalWidth - 2;
-    const chatColumnWidth = Math.floor(availableWidth * (isWideScreen ? 0.62 : 0.6));
-    const tasksColumnWidth = availableWidth - chatColumnWidth;
-    const contentWidth = tasksColumnWidth - 6;
+    const { maxTasksVisible, rightColumnWidth } = getTuiLayoutMetrics({
+      width: terminalWidth,
+      height: 24,
+    });
+    const contentWidth = rightColumnWidth - 6;
 
     let totalLines = 0;
     for (let i = 0; i < tasks.length; i++) {
@@ -40,12 +40,16 @@ export function useDataFetching(
       const wrapped = wrapText(task.title + suffix, Math.max(1, contentWidth - prefix.length));
       totalLines += wrapped.length;
     }
-    return Math.max(0, totalLines - maxVisible);
+    return Math.max(0, totalLines - maxTasksVisible);
   }, [terminalWidth]);
 
   // Fetch today's log
   const fetchTodayLog = useCallback(async () => {
-    if (!logs) return;
+    if (!logs) {
+      useTuiStore.getState().setTodayLog(null);
+      useTuiStore.getState().setLoadingLog(false);
+      return;
+    }
     try {
       useTuiStore.getState().setLoadingLog(true);
       const today = todayLogDate();
@@ -65,7 +69,11 @@ export function useDataFetching(
 
   // Fetch open tasks
   const fetchTasks = useCallback(async (showLoading = false) => {
-    if (!todos) return;
+    if (!todos) {
+      useTuiStore.getState().setTasks([]);
+      useTuiStore.getState().setLoadingTasks(false);
+      return;
+    }
     try {
       if (showLoading) useTuiStore.getState().setLoadingTasks(true);
       const openTasks = await todos.listOpen();

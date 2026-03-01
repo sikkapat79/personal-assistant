@@ -79,6 +79,9 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
   const rendererRef = useRef(params.renderer);
   useEffect(() => { rendererRef.current = params.renderer; }, [params.renderer]);
 
+  const resolvedRef = useRef(params.resolved);
+  useEffect(() => { resolvedRef.current = params.resolved; }, [params.resolved]);
+
   useKeyboard((key) => {
     // Global Ctrl+C - always exits regardless of page or focus
     if (key.ctrl && key.name === 'c') {
@@ -196,8 +199,8 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
     }
 
     if (key.ctrl && key.name === 'p') {
-      params.setDisplayNameInput(params.resolved.profile.displayName);
-      params.setSavedDisplayName(params.resolved.profile.displayName);
+      params.setDisplayNameInput(resolvedRef.current.profile.displayName);
+      params.setSavedDisplayName(resolvedRef.current.profile.displayName);
       params.setSettingsTab('profile');
       params.setApiKeysSelectedRow(0); params.setApiKeysEditingIndex(null); params.setApiKeysEditInput('');
       params.setPage('settings');
@@ -244,7 +247,9 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
     }
 
     if (key.name === 'return') {
-      submitRef.current();
+      void submitRef.current?.()?.catch((err) => {
+        console.error('Failed to submit chat input:', err);
+      });
       return;
     }
 
