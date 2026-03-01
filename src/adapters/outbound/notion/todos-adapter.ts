@@ -158,6 +158,15 @@ export class NotionTodosAdapter implements ITodosRepository {
   async delete(id: TodoId): Promise<void> {
     await this.client.pages.update({ page_id: id, archived: true });
   }
+
+  async fetchLastEditedTime(pageId: string): Promise<string | null> {
+    try {
+      const page = await this.client.pages.retrieve({ page_id: pageId });
+      return 'last_edited_time' in page ? (page.last_edited_time as string) : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 function selectValueToStatus(selectValue: string | undefined, doneKind: TodosDoneKind): TodoStatus {
