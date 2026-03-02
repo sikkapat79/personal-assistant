@@ -65,13 +65,20 @@ The `daily` script runs `journal today`. Optionally use `node-notifier` or `osas
 ## Project layout
 
 - **domain/** – entities (DailyLog, Todo), value objects. No I/O.
-- **application/ports/** – ILogsRepository, ITodosRepository, etc.
+- **application/ports/** – ILogsRepository, ITodosRepository, IEventQueue, event-types (EntityType/EventType enums), DTOs.
 - **application/use-cases/** – log, todos, agent (orchestration only).
 - **adapters/inbound/cli/** – CLI entry (`index.ts`), interactive prompt, and TUI. TUI is split into a thin entry and a module:
   - **tui-app.tsx** – entry only: create CLI renderer, mount `<AppRoot />`.
-  - **tui/** – TUI module (one function/component per file): `App.tsx`, `AppRoot.tsx`, hooks (`useAgent`, `useSpinner`, `usePaxAnimationFrame`), small components (`FirstRunSetupContent`, `ColumnScanningContent`, `ColumnMappingContent`, `SettingsPageContent`), utils (`energyBarSegments`, `getPaxMood`, `clearConsole`, `normalizeError`, `formatTodayLoadError`, `maskSecret`, `typeableChar`), **tui/constants/** (spinner, tips, pax, setup, layout), **tui/types.ts**.
-- **adapters/outbound/notion/** – Notion API adapters.
-- **agent-context/** – editable docs, rules, and skills for the agent (data rules, journal/task reference). Loaded each run; edit to change agent behaviour without code changes.
+  - **tui/** – TUI module: `App.tsx` (164 lines, thin coordinator), Zustand store, feature-based structure (`chat/`, `tasks/`, `log/`, `settings/`, `layout/`, `hooks/`).
+- **adapters/outbound/notion/** – Notion API adapters (sync write targets; not queried at startup).
+- **adapters/outbound/local/** – Local-first layer:
+  - `BunSqliteEventQueue` – write queue + snapshot cache (`~/.pa/pax.db`, bun:sqlite)
+  - `LocalProjection` – in-memory projection with registered handler dispatch
+  - `LocalAdapterBase` – base class for domain adapters; `write()` handles all event boilerplate
+  - `LocalTodosAdapter` / `LocalLogsAdapter` – implement repository ports; reads from projection, writes to queue
+  - `SyncEngine` – background 10s flush; pushes pending events to Notion; conflict resolution via timestamp vs Notion `last_edited_time`
+  - `hydration.ts` – pulls Notion state on startup (background, non-blocking)
+- **agent-context/** – editable docs, rules, and skills for the agent. Loaded each run; edit to change agent behaviour without code changes.
 
 ## License and community
 

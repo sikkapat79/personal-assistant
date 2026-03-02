@@ -53,6 +53,15 @@ export class NotionLogsAdapter implements ILogsRepository {
     return out;
   }
 
+  async fetchLastEditedTime(pageId: string): Promise<string | null> {
+    try {
+      const page = await this.client.pages.retrieve({ page_id: pageId });
+      return 'last_edited_time' in page ? (page.last_edited_time as string) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async save(log: DailyLog): Promise<void> {
     const c = this.columns;
     const content = log.content;
