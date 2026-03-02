@@ -83,6 +83,18 @@ export class SyncEngine {
           event.event_type === EventType.TodoCreated &&
           !hasPersistedNotionId;
 
+        // TodoCreated with an existing mapping = already synced (crash-recovery path:
+        // app crashed after mapping was persisted but before markSynced ran).
+        // Skip early — no fetchLastEditedTime call needed, no duplicate Notion page.
+        if (
+          event.entity_type === EntityType.Todo &&
+          event.event_type === EventType.TodoCreated &&
+          hasPersistedNotionId
+        ) {
+          syncedIds.push(event.id);
+          continue;
+        }
+
         if (!isNewUnsyncedTodo) {
           const notionLastEditedTime = await this.fetchLastEditedTime(
             event.entity_type,
@@ -93,18 +105,6 @@ export class SyncEngine {
             syncedIds.push(event.id);
             continue;
           }
-        }
-
-        // TodoCreated with an existing mapping = already synced (crash-recovery path:
-        // app crashed after mapping was persisted but before markSynced ran).
-        // Skip to avoid creating a duplicate Notion page.
-        if (
-          event.entity_type === EntityType.Todo &&
-          event.event_type === EventType.TodoCreated &&
-          hasPersistedNotionId
-        ) {
-          syncedIds.push(event.id);
-          continue;
         }
 
         await this.applyEventToNotion(event, resolvedEntityId, batchIdMap);
