@@ -28,13 +28,13 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
   }
 
   async listOpen(): Promise<Todo[]> {
-    return Array.from(this.projection.todos.values()).filter(
-      (todo) => todo.status !== 'Done'
-    );
+    return Array.from(this.projection.todos.values())
+      .filter((todo) => todo.status !== 'Done')
+      .map((todo) => ({ ...todo }));
   }
 
   async listAll(): Promise<Todo[]> {
-    return Array.from(this.projection.todos.values());
+    return Array.from(this.projection.todos.values()).map((todo) => ({ ...todo }));
   }
 
   async add(todo: Todo): Promise<Todo> {

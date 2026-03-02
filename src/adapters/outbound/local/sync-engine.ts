@@ -22,7 +22,9 @@ export class SyncEngine {
   start(): void {
     if (this.intervalHandle !== null) return;
     const handle = setInterval(() => {
-      void this.flush();
+      this.flush().catch((err) =>
+        console.error('[SyncEngine] flush error:', err instanceof Error ? err.message : String(err))
+      );
     }, SYNC_INTERVAL_MS);
     // Allow the process to exit even if the interval is still active
     handle.unref();
@@ -37,7 +39,9 @@ export class SyncEngine {
 
   nudge(): void {
     setImmediate(() => {
-      void this.flush();
+      this.flush().catch((err) =>
+        console.error('[SyncEngine] flush error:', err instanceof Error ? err.message : String(err))
+      );
     });
   }
 
@@ -89,6 +93,18 @@ export class SyncEngine {
             syncedIds.push(event.id);
             continue;
           }
+        }
+
+        // TodoCreated with an existing mapping = already synced (crash-recovery path:
+        // app crashed after mapping was persisted but before markSynced ran).
+        // Skip to avoid creating a duplicate Notion page.
+        if (
+          event.entity_type === EntityType.Todo &&
+          event.event_type === EventType.TodoCreated &&
+          hasPersistedNotionId
+        ) {
+          syncedIds.push(event.id);
+          continue;
         }
 
         await this.applyEventToNotion(event, resolvedEntityId, batchIdMap);

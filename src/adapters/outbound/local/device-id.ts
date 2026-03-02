@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { openSync, writeSync, closeSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { getConfigDir } from '../../../config/config-dir';
 
@@ -8,11 +8,16 @@ export function getDeviceId(): string {
   const configDir = getConfigDir();
   const deviceIdPath = join(configDir, DEVICE_ID_FILENAME);
 
-  if (existsSync(deviceIdPath)) {
+  // Atomic exclusive create — 'wx' fails with EEXIST if the file already exists,
+  // avoiding the TOCTOU race between existsSync and writeFileSync.
+  const newDeviceId = crypto.randomUUID();
+  try {
+    const fd = openSync(deviceIdPath, 'wx', 0o600);
+    writeSync(fd, newDeviceId);
+    closeSync(fd);
+    return newDeviceId;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     return readFileSync(deviceIdPath, 'utf-8').trim();
   }
-
-  const newDeviceId = crypto.randomUUID();
-  writeFileSync(deviceIdPath, newDeviceId, { encoding: 'utf-8', mode: 0o600 });
-  return newDeviceId;
 }

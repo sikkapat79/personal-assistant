@@ -1,4 +1,6 @@
 import type { IEventQueue } from '../../../application/ports/event-queue';
+import type { DailyLog } from '../../../domain/entities/daily-log';
+import type { Todo } from '../../../domain/entities/todo';
 import type { NotionLogsAdapter } from '../notion/logs-adapter';
 import type { NotionTodosAdapter } from '../notion/todos-adapter';
 import type { LocalProjection } from './local-projection';
@@ -22,7 +24,7 @@ export async function hydrateFromNotion(
   const from = dayjs().subtract(HYDRATION_LOOKBACK_DAYS, 'day').format('YYYY-MM-DD');
   const to = dayjs().format('YYYY-MM-DD');
 
-  let todos, logs;
+  let todos: Todo[], logs: DailyLog[];
   try {
     [todos, logs] = await Promise.all([
       notionTodos.listAll(),
