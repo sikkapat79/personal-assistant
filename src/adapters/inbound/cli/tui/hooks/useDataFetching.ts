@@ -15,7 +15,9 @@ export function useDataFetching(
   terminalWidth: number
 ): {
   fetchTodayLog: () => Promise<void>;
+  fetchTasks: () => Promise<void>;
   getMaxTasksScroll: () => number;
+  scrollToTask: (taskIndex: number) => void;
 } {
   // Subscribed to trigger the auto-scroll effect when new messages arrive
   const history = useTuiStore((s) => s.history);
@@ -101,9 +103,51 @@ export function useDataFetching(
     return () => clearInterval(interval);
   }, [todos, fetchTasks]);
 
-  // Clamp tasks scroll when tasks change (preserve position during polling)
+  // Scroll to keep a task visible (call after cursor moves)
+  const scrollToTask = useCallback((taskIndex: number) => {
+    const tasks = useTuiStore.getState().tasks;
+    if (tasks.length === 0) return;
+    const { maxTasksVisible, rightColumnWidth } = getTuiLayoutMetrics({
+      width: terminalWidth,
+      height: 24,
+    });
+    const contentWidth = rightColumnWidth - 6;
+
+    // Compute line start of taskIndex
+    let lineStart = 0;
+    for (let i = 0; i < taskIndex && i < tasks.length; i++) {
+      const t = tasks[i];
+      const statusIcon = t.status === 'In Progress' ? '▶' : '○';
+      const prefix = `${i + 1}. ${statusIcon} `;
+      const suffix = t.priority ? ` (${t.priority})` : '';
+      const wrapped = wrapText(t.title + suffix, Math.max(1, contentWidth - prefix.length));
+      lineStart += wrapped.length;
+    }
+
+    const task = tasks[taskIndex];
+    if (!task) return;
+    const statusIcon = task.status === 'In Progress' ? '▶' : '○';
+    const prefix = `${taskIndex + 1}. ${statusIcon} `;
+    const suffix = task.priority ? ` (${task.priority})` : '';
+    const wrapped = wrapText(task.title + suffix, Math.max(1, contentWidth - prefix.length));
+    const lineEnd = lineStart + wrapped.length - 1;
+
+    useTuiStore.getState().setTasksScrollOffset((offset) => {
+      if (lineStart < offset) return lineStart;
+      if (lineEnd >= offset + maxTasksVisible) return lineEnd - maxTasksVisible + 1;
+      return offset;
+    });
+  }, [terminalWidth]);
+
+  // Clamp tasks scroll and selectedTaskIndex when tasks change (polling / post-write)
   useEffect(() => {
     useTuiStore.getState().setTasksScrollOffset((offset) => Math.min(offset, getMaxTasksScroll()));
+    const { selectedTaskIndex, setSelectedTaskIndex } = useTuiStore.getState();
+    if (tasks.length === 0) {
+      setSelectedTaskIndex(0);
+    } else if (selectedTaskIndex >= tasks.length) {
+      setSelectedTaskIndex(tasks.length - 1);
+    }
   }, [tasks, getMaxTasksScroll]);
 
   // Auto-scroll chat to bottom when new messages arrive (only if already near bottom)
@@ -114,5 +158,5 @@ export function useDataFetching(
     );
   }, [history, getMaxChatScroll]);
 
-  return { fetchTodayLog, getMaxTasksScroll };
+  return { fetchTodayLog, fetchTasks, getMaxTasksScroll, scrollToTask };
 }

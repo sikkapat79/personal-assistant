@@ -4,6 +4,7 @@ import { designTokens } from '../../../../../design-tokens';
 import { truncateText, wrapText } from '../utils/wrapText';
 import { useTuiStore } from '../store/tuiStore';
 
+
 interface TasksSectionProps {
   contentWidth: number;
   maxVisibleItems?: number;
@@ -17,19 +18,22 @@ export function TasksSection({
   const loadingTasks = useTuiStore((s) => s.loadingTasks);
   const tasksScrollOffset = useTuiStore((s) => s.tasksScrollOffset);
   const focusedSection = useTuiStore((s) => s.focusedSection);
+  const selectedTaskIndex = useTuiStore((s) => s.selectedTaskIndex);
   const focused = focusedSection === 'tasks';
 
   // Convert all tasks to wrapped lines
-  const allLines: Array<{ taskId: string; text: string; color?: string; lineIndex: number; taskIndex: number }> = [];
+  const allLines: Array<{ taskId: string; text: string; color?: string; bold?: boolean; lineIndex: number; taskIndex: number }> = [];
 
   for (let taskIndex = 0; taskIndex < tasks.length; taskIndex++) {
     const task = tasks[taskIndex];
+    const isSelected = focused && taskIndex === selectedTaskIndex;
     const statusIcon = task.status === 'In Progress' ? '▶' : '○';
-    const prefix = `${taskIndex + 1}. ${statusIcon} `;
+    const cursorMark = isSelected ? '>' : ' ';
+    const prefix = `${taskIndex + 1}.${cursorMark}${statusIcon} `;
     const suffix = task.priority ? ` (${task.priority})` : '';
     const taskText = task.title + suffix;
     const wrappedLines = wrapText(taskText, contentWidth - prefix.length);
-    const color = task.status === 'In Progress' ? designTokens.color.accent : undefined;
+    const color = isSelected ? designTokens.color.accent : task.status === 'In Progress' ? designTokens.color.accent : undefined;
 
     for (let lineIndex = 0; lineIndex < wrappedLines.length; lineIndex++) {
       allLines.push({
@@ -39,6 +43,7 @@ export function TasksSection({
             ? prefix + wrappedLines[lineIndex]
             : ' '.repeat(prefix.length) + wrappedLines[lineIndex],
         color,
+        bold: isSelected,
         lineIndex,
         taskIndex
       });
@@ -64,7 +69,11 @@ export function TasksSection({
       {!loadingTasks && tasks.length > 0 && (
         <box style={{ flexDirection: 'column', marginTop: 1 }}>
           {visibleLines.map((line) => (
-            <text key={`${line.taskId}-${line.lineIndex}`} fg={line.color}>
+            <text
+              key={`${line.taskId}-${line.lineIndex}`}
+              fg={line.color}
+              style={line.bold ? { attributes: TextAttributes.BOLD } : undefined}
+            >
               {line.text}
             </text>
           ))}

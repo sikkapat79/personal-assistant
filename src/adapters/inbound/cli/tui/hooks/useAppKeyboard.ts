@@ -7,6 +7,8 @@ import { SETUP_STEPS, SETTINGS_STEPS } from '../constants/setup';
 import { getResolvedConfig, hasRequiredConfig } from '../../../../../config/resolved';
 import type { Page } from '../types';
 import { useTuiStore } from '../store/tuiStore';
+import type { TodosUseCase } from '../../../../../application/use-cases/todos-use-case';
+import type { TodoId } from '../../../../../domain/value-objects/todo-id';
 
 interface AppKeyboardParams {
   // read values — will be mirrored to refs internally
@@ -33,6 +35,9 @@ interface AppKeyboardParams {
   submit: () => Promise<void>;
   getMaxTasksScroll: () => number;
   getMaxChatScroll: () => number;
+  fetchTasks: () => Promise<void>;
+  scrollToTask: (taskIndex: number) => void;
+  todos: TodosUseCase | null;
   renderer: ReturnType<typeof useRenderer>;
   onConfigSaved?: () => void;
 }
@@ -82,6 +87,15 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
   const resolvedRef = useRef(params.resolved);
   useEffect(() => { resolvedRef.current = params.resolved; }, [params.resolved]);
 
+  const fetchTasksRef = useRef(params.fetchTasks);
+  useEffect(() => { fetchTasksRef.current = params.fetchTasks; }, [params.fetchTasks]);
+
+  const scrollToTaskRef = useRef(params.scrollToTask);
+  useEffect(() => { scrollToTaskRef.current = params.scrollToTask; }, [params.scrollToTask]);
+
+  const todosRef = useRef(params.todos);
+  useEffect(() => { todosRef.current = params.todos; }, [params.todos]);
+
   useKeyboard((key) => {
     // Global Ctrl+C - always exits regardless of page or focus
     if (key.ctrl && key.name === 'c') {
@@ -95,6 +109,14 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
     function printableInput(k: { ctrl?: boolean; meta?: boolean; sequence?: string }): string {
       if (k.ctrl || k.meta) return '';
       return (k.sequence ?? '').replace(/[^\x20-\x7E]/g, '');
+    }
+
+    // Task detail page — Escape goes back to main
+    if (pageRef.current === 'task-detail') {
+      if (key.name === 'escape') {
+        params.setPage('main');
+      }
+      return;
     }
 
     // Settings page input
@@ -214,15 +236,44 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
       return;
     }
 
-    // Handle scroll keys for tasks and chat sections
+    // Handle keys for tasks section
     if (useTuiStore.getState().focusedSection === 'tasks') {
+      const { tasks, selectedTaskIndex } = useTuiStore.getState();
+
       if (key.name === 'up') {
-        useTuiStore.getState().setTasksScrollOffset((offset) => Math.max(0, offset - 1));
+        const next = Math.max(0, selectedTaskIndex - 1);
+        useTuiStore.getState().setSelectedTaskIndex(next);
+        scrollToTaskRef.current(next);
         return;
       }
       if (key.name === 'down') {
-        const maxScroll = getMaxTasksScrollRef.current();
-        useTuiStore.getState().setTasksScrollOffset((offset) => Math.min(maxScroll, offset + 1));
+        const next = Math.min(tasks.length - 1, selectedTaskIndex + 1);
+        useTuiStore.getState().setSelectedTaskIndex(next);
+        scrollToTaskRef.current(next);
+        return;
+      }
+      if (key.name === 'space') {
+        const task = tasks[selectedTaskIndex];
+        const tc = todosRef.current;
+        if (task && tc) {
+          if (task.status === 'Todo') {
+            void tc.updateByIdOrIndex(task.id, { status: 'In Progress' }).then(() =>
+              fetchTasksRef.current()
+            );
+          } else if (task.status === 'In Progress') {
+            void tc.completeByIdOrIndex(task.id).then(() =>
+              fetchTasksRef.current()
+            );
+          }
+        }
+        return;
+      }
+      if (key.name === 'return') {
+        const task = tasks[selectedTaskIndex];
+        if (task) {
+          useTuiStore.getState().setSelectedTask(task);
+          params.setPage('task-detail');
+        }
         return;
       }
       return; // Don't handle other keys

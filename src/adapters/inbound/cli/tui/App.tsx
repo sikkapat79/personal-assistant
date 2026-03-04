@@ -10,6 +10,7 @@ import { loadSettings } from '../../../../config/settings';
 import { SETUP_STEPS } from './constants/setup';
 import { SettingsPageContent } from './settings/SettingsPageContent';
 import { FirstRunSetupContent } from './settings/FirstRunSetupContent';
+import { TaskDetailPageContent } from './tasks/TaskDetailPageContent';
 import type { Page } from './types';
 import { TerminalTooSmallScreen } from './layout/TerminalTooSmallScreen';
 import { StartupErrorScreen } from './layout/StartupErrorScreen';
@@ -36,6 +37,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
   useTerminalSize();
 
   const terminalSize = useTuiStore((s) => s.terminalSize);
+  const selectedTask = useTuiStore((s) => s.selectedTask);
 
   // Page navigation state
   const [page, setPage] = useState<Page>('main');
@@ -50,7 +52,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
 
   const { submit, getMaxChatScroll } = useChat(agent, renderer, fetchTodayLogRef, terminalSize.width);
 
-  const { fetchTodayLog, getMaxTasksScroll } = useDataFetching(
+  const { fetchTodayLog, fetchTasks, getMaxTasksScroll, scrollToTask } = useDataFetching(
     logs,
     todos,
     getMaxChatScroll,
@@ -101,6 +103,9 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
     submit,
     getMaxTasksScroll,
     getMaxChatScroll,
+    fetchTasks,
+    scrollToTask,
+    todos,
     renderer,
     onConfigSaved,
   });
@@ -158,6 +163,10 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
   // Handle errors (only when config is present; missing-config case is handled by wizard above)
   if (error) {
     return <StartupErrorScreen error={error} terminalWidth={terminalSize.width} />;
+  }
+
+  if (page === 'task-detail') {
+    return <TaskDetailPageContent task={selectedTask} terminalWidth={terminalSize.width} />;
   }
 
   return <MainLayout />;

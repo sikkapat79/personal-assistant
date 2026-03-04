@@ -10,11 +10,16 @@ const VALID_CATEGORIES: TodoCategory[] = ['Work', 'Health', 'Personal', 'Learnin
 const VALID_PRIORITIES: TodoPriority[] = ['High', 'Medium', 'Low'];
 
 /**
- * Mock Todos Adapter - Returns sanitized data from fixtures
- * Use this for visual testing without external API calls
+ * Mock Todos Adapter - Returns sanitized data from fixtures.
+ * Maintains an in-memory mutable copy so status changes are reflected
+ * during visual testing without external API calls.
  */
 export class MockTodosAdapter implements ITodosRepository {
-  private mockData = mockDataJson;
+  private todos: Todo[];
+
+  constructor() {
+    this.todos = mockDataJson.tasks.map(raw => this.toTodo(raw));
+  }
 
   private toTodo(raw: (typeof mockDataJson.tasks)[number]): Todo {
     const status = this.parseStatus(raw);
@@ -53,29 +58,44 @@ export class MockTodosAdapter implements ITodosRepository {
   }
 
   async listAll(): Promise<Todo[]> {
-    return this.mockData.tasks.map(t => this.toTodo(t));
+    return [...this.todos];
   }
 
   async listOpen(): Promise<Todo[]> {
-    return this.mockData.tasks
-      .filter(t => t.status === 'Todo' || t.status === 'In Progress')
-      .map(t => this.toTodo(t));
+    return this.todos.filter(t => t.status !== 'Done');
   }
 
   async add(todo: Todo): Promise<Todo> {
-    console.log('[MockTodosAdapter] add called (no-op):', todo.title);
+    this.todos.push(todo);
     return todo;
   }
 
   async complete(id: TodoId): Promise<void> {
-    console.log('[MockTodosAdapter] complete called (no-op):', id);
+    const idx = this.todos.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      this.todos[idx] = { ...this.todos[idx], status: 'Done' };
+    }
   }
 
   async update(id: TodoId, patch: TodoUpdatePatch): Promise<void> {
-    console.log('[MockTodosAdapter] update called (no-op):', id, patch);
+    const idx = this.todos.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      const existing = this.todos[idx];
+      this.todos[idx] = createTodo(
+        patch.title ?? existing.title,
+        patch.dueDate !== undefined ? patch.dueDate : existing.dueDate,
+        existing.id,
+        patch.status ?? existing.status,
+        {
+          category: patch.category ?? existing.category,
+          notes: patch.notes ?? existing.notes,
+          priority: patch.priority ?? existing.priority,
+        }
+      );
+    }
   }
 
   async delete(id: TodoId): Promise<void> {
-    console.log('[MockTodosAdapter] delete called (no-op):', id);
+    this.todos = this.todos.filter(t => t.id !== id);
   }
 }
