@@ -153,6 +153,17 @@ export class BunSqliteEventQueue implements IEventQueue {
     saveTodosAndLogs();
   }
 
+  upsertSnapshotLog(log: DailyLog): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO snapshot_logs (date, data, fetched_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(date) DO UPDATE SET data = excluded.data, fetched_at = excluded.fetched_at`
+      )
+      .run(log.date, JSON.stringify(log), now);
+  }
+
   getEntityIdMap(): EntityIdMap {
     const rows = this.db
       .prepare('SELECT local_id, notion_id FROM entity_id_map')
