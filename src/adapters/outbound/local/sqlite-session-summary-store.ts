@@ -11,7 +11,7 @@ export class SqliteSessionSummaryStore implements ISessionSummaryStore {
   private readonly db: Database;
 
   constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: false });
+    this.db = new Database(dbPath);
   }
 
   load(): string | null {
