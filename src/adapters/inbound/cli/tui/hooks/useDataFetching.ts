@@ -11,7 +11,8 @@ export function useDataFetching(
   logs: ILogsRepository | null,
   todos: TodosUseCase | null,
   getMaxChatScroll: () => number,
-  terminalWidth: number
+  terminalWidth: number,
+  terminalHeight: number
 ): {
   fetchTodayLog: () => Promise<void>;
   fetchTasks: () => Promise<void>;
@@ -28,7 +29,7 @@ export function useDataFetching(
     const tasks = useTuiStore.getState().tasks;
     const { maxTasksVisible, rightColumnWidth } = getTuiLayoutMetrics({
       width: terminalWidth,
-      height: 24,
+      height: terminalHeight,
     });
     const contentWidth = rightColumnWidth - 6;
 
@@ -42,7 +43,7 @@ export function useDataFetching(
       totalLines += wrapped.length;
     }
     return Math.max(0, totalLines - maxTasksVisible);
-  }, [terminalWidth]);
+  }, [terminalWidth, terminalHeight]);
 
   // Fetch today's log
   const fetchTodayLog = useCallback(async () => {
@@ -108,7 +109,7 @@ export function useDataFetching(
     if (tasks.length === 0) return;
     const { maxTasksVisible, rightColumnWidth } = getTuiLayoutMetrics({
       width: terminalWidth,
-      height: 24,
+      height: terminalHeight,
     });
     const contentWidth = rightColumnWidth - 6;
 
@@ -136,7 +137,7 @@ export function useDataFetching(
       if (lineEnd >= offset + maxTasksVisible) return lineEnd - maxTasksVisible + 1;
       return offset;
     });
-  }, [terminalWidth]);
+  }, [terminalWidth, terminalHeight]);
 
   // Clamp tasks scroll and selectedTaskIndex when tasks change (polling / post-write)
   useEffect(() => {

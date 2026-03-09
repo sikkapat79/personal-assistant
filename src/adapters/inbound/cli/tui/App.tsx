@@ -56,7 +56,8 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
     logs,
     todos,
     getMaxChatScroll,
-    terminalSize.width
+    terminalSize.width,
+    terminalSize.height
   );
 
   useEffect(() => { fetchTodayLogRef.current = fetchTodayLog; }, [fetchTodayLog]);
