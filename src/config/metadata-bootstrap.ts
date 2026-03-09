@@ -20,6 +20,8 @@ const LOGS_NOTION_TYPES: Record<keyof LogsColumns, string> = {
   improve: 'rich_text',
   gratitude: 'rich_text',
   tomorrow: 'rich_text',
+  sleepNotes: 'rich_text',
+  sleepMins: 'number',
 };
 
 const TODOS_NOTION_TYPES: Record<keyof TodosColumns, string> = {

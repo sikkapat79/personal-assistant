@@ -8,8 +8,10 @@ import type { LogInputDto, LogResultDto } from '../dto/log-dto';
 function mergeLogContent(existing: LogContent | undefined, input: LogInputDto): LogContent {
   const title = input.title ?? existing?.title ?? 'Untitled';
   const notes = input.notes ?? existing?.notes ?? '';
-  const optional = <K extends keyof Omit<LogContent, 'title' | 'notes'>>(key: K) =>
+  const optional = <K extends keyof Omit<LogContent, 'title' | 'notes' | 'sleepNotes' | 'sleepMins'>>(key: K) =>
     input[key] !== undefined ? input[key] : existing?.[key];
+  // sleepNotes: prefer input, then existing sleepNotes, then fall back to existing legacy notes for backward compat
+  const sleepNotes = input.sleepNotes ?? existing?.sleepNotes ?? existing?.notes;
   return createLogContent(title, notes, {
     score: optional('score'),
     mood: optional('mood'),
@@ -22,6 +24,8 @@ function mergeLogContent(existing: LogContent | undefined, input: LogInputDto): 
     improve: optional('improve'),
     gratitude: optional('gratitude'),
     tomorrow: optional('tomorrow'),
+    sleepNotes,
+    sleepMins: input.sleepMins !== undefined ? input.sleepMins : existing?.sleepMins,
   });
 }
 
@@ -32,12 +36,14 @@ export class LogUseCase {
     const date = createLogDate(input.date);
     const existing = await this.logs.findByDate(date);
     if (!existing) {
-      const hasNotes = input.notes !== undefined && String(input.notes).trim().length > 0;
+      const hasSleep =
+        (input.sleepNotes !== undefined && String(input.sleepNotes).trim().length > 0) ||
+        (input.notes !== undefined && String(input.notes).trim().length > 0);
       const hasMood = input.mood !== undefined && Number.isFinite(input.mood);
       const hasEnergy = input.energy !== undefined && Number.isFinite(input.energy);
-      if (!hasNotes || !hasMood || !hasEnergy) {
+      if (!hasSleep || !hasMood || !hasEnergy) {
         const missing: string[] = [];
-        if (!hasNotes) missing.push('sleeping record (notes)');
+        if (!hasSleep) missing.push('sleeping record (sleepNotes or notes)');
         if (!hasMood) missing.push('mood');
         if (!hasEnergy) missing.push('energy budget');
         throw new Error(`New log must include at least: ${missing.join(', ')}. Create first with sleep, mood, and energy.`);

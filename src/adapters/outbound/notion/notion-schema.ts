@@ -58,6 +58,8 @@ export const NOTION_SCHEMA_PURPOSE = {
     improve: '[B] User paragraphs → translate',
     gratitude: '[B] User paragraphs → translate',
     tomorrow: '[C] TODOs for next day from energy/priority/due',
+    sleepNotes: 'Sleep notes — what / how they slept',
+    sleepMins: 'Minutes slept that night',
   },
 } as const;
 

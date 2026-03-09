@@ -13,12 +13,12 @@ There are **three distinct modes**. Use the right one every time. **Create first
 **When:** `get_logs` shows no log for that date. Do **not** use single_field or summarize until the log exists.
 
 **What to do:**
-1. Only when the user is starting their day or asking to create today's log: ask for **sleeping record** (how they slept) and **waking-up mood** (1–5). Do **not** ask for energy budget. Do not ask for sleep/mood in every reply—only when creating or opening today's log.
+1. Only when the user is starting their day or asking to create today's log: ask for **sleeping record** (sleep notes + how many minutes they slept, if known) and **waking-up mood** (1–5). Do **not** ask for energy budget. Do not ask for sleep/mood in every reply—only when creating or opening today's log.
 2. Derive **energy budget** from the daily check-in: use their sleep (notes), waking mood, and optionally yesterday's overview (`get_logs` for yesterday—score, deep work hours, workout) to set energy (1–100). Do not ask the user for energy; it comes from daily check-in.
-3. Call `apply_log_update` with `mode: "create"` and: `date`, `sleep_notes` (or `notes`), `mood`, `energy` (the value you derived). Optional: `title` (e.g. "Good sleep · calm start").
+3. Call `apply_log_update` with `mode: "create"` and: `date`, `sleep_notes`, `sleep_mins` (minutes slept, if provided), `mood`, `energy` (the value you derived). Optional: `title` (e.g. "Good sleep · calm start").
 4. Only after the log is created may you use single_field or summarize for that date.
 
-**New logs must include at least:** sleeping record (in notes), waking-up mood (mood), energy budget (energy). Energy is **not** asked from the user—derive it from daily check-in (sleep + mood + yesterday).
+**New logs must include at least:** sleep_notes, waking-up mood (mood), energy budget (energy). Energy is **not** asked from the user—derive it from daily check-in (sleep + mood + yesterday).
 
 ### Mode 1: Single-field update (most of the time)
 
@@ -40,6 +40,8 @@ If there is no log for that date, the tool will return an error: create first (M
 **When:** A log already exists for that date, and the user says they're wrapping up the day or asks for a summary.
 
 **What to do:** First, select all undone and done tasks for that specific day: call `list_todos` with `include_done: true` and `for_date: <that date>` (YYYY-MM-DD). Use that list to analyze and fill the summary fields. Then call `apply_log_update` with `mode: "summarize"` and **all** of: `date`, `score`, `title`, `went_well`, `improve`, `gratitude`, `tomorrow`, `energy`. Optional: `notes` (short overall line). Do not skip any required field.
+
+**Do not preview or ask for confirmation before saving.** Draft the values yourself from what the user shared and call the tool immediately. The user can correct individual fields with single_field afterward. Never say "say 'save these' and I'll write it" — just write it.
 
 Then in your **reply**: give the short overall line and list **done & undone tasks for that day** (from the `list_todos` result above).
 
