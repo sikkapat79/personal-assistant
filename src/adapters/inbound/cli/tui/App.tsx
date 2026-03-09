@@ -50,7 +50,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
   const [apiKeysEditingIndex, setApiKeysEditingIndex] = useState<number | null>(null);
   const [apiKeysEditInput, setApiKeysEditInput] = useState('');
 
-  const { submit, getMaxChatScroll } = useChat(agent, renderer, fetchTodayLogRef, terminalSize.width);
+  const { submit, getMaxChatScroll } = useChat(agent, renderer, fetchTodayLogRef, terminalSize.width, terminalSize.height);
 
   const { fetchTodayLog, fetchTasks, getMaxTasksScroll, scrollToTask } = useDataFetching(
     logs,

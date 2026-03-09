@@ -6,7 +6,6 @@ import { getTuiLayoutMetrics } from '../utils/layoutMetrics';
 import type { TodosUseCase } from '../../../../../application/use-cases/todos-use-case';
 import { useTuiStore } from '../store/tuiStore';
 
-const AUTO_SCROLL_THRESHOLD = 3;
 
 export function useDataFetching(
   logs: ILogsRepository | null,
@@ -150,12 +149,9 @@ export function useDataFetching(
     }
   }, [tasks, getMaxTasksScroll]);
 
-  // Auto-scroll chat to bottom when new messages arrive (only if already near bottom)
+  // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
-    const maxScroll = getMaxChatScroll();
-    useTuiStore.getState().setChatScrollOffset((current) =>
-      current >= maxScroll - AUTO_SCROLL_THRESHOLD ? maxScroll : current
-    );
+    useTuiStore.getState().setChatScrollOffset(getMaxChatScroll());
   }, [history, getMaxChatScroll]);
 
   return { fetchTodayLog, fetchTasks, getMaxTasksScroll, scrollToTask };

@@ -19,6 +19,7 @@ export function MainLayout() {
     topbarContentWidth,
     inputMaxLines,
     maxTasksVisible,
+    maxChatLines,
   } = getTuiLayoutMetrics(terminalSize);
 
   return (
@@ -26,7 +27,7 @@ export function MainLayout() {
       <TopbarSection contentWidth={topbarContentWidth} />
       <box style={{ flexDirection: 'row', overflow: 'hidden', flexGrow: 1 }}>
         <box style={{ flexDirection: 'column', width: chatColumnWidth, overflow: 'hidden' }}>
-          <ChatSection contentWidth={chatContentWidth} maxVisibleMessages={15} />
+          <ChatSection contentWidth={chatContentWidth} maxVisibleMessages={maxChatLines} />
         </box>
         <box style={{ flexDirection: 'column', width: rightColumnWidth, overflow: 'hidden' }}>
           <TasksSection contentWidth={rightColumnWidth - 6} maxVisibleItems={maxTasksVisible} />
