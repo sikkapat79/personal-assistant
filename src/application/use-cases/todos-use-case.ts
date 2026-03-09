@@ -52,15 +52,14 @@ export class TodosUseCase {
   private async resolveIdOrIndex(idOrIndex: string): Promise<TodoId> {
     const trimmed = idOrIndex.trim();
     if (!trimmed) throw new Error('Invalid todo index or id: value is empty');
-    // UUIDs always contain '-'; treat them as IDs directly to avoid parseInt
-    // misidentifying e.g. "31228e77-..." as the number 31228.
-    if (trimmed.includes('-')) return trimmed as TodoId;
-    const n = parseInt(trimmed, 10);
-    if (!Number.isNaN(n) && n >= 1) {
-      const open = await this.todos.listOpen();
-      const item = open[n - 1];
-      if (!item) throw new Error(`No todo at index ${n}`);
-      return item.id;
+    if (/^\d+$/.test(trimmed)) {
+      const n = Number(trimmed);
+      if (n >= 1) {
+        const open = await this.todos.listOpen();
+        const item = open[n - 1];
+        if (!item) throw new Error(`No todo at index ${n}`);
+        return item.id;
+      }
     }
     return trimmed as TodoId;
   }

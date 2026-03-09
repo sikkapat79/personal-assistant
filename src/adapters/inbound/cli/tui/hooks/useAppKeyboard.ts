@@ -247,9 +247,9 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
         return;
       }
       if (key.name === 'down') {
-        const next = Math.min(tasks.length - 1, selectedTaskIndex + 1);
+        const next = Math.max(-1, Math.min(tasks.length - 1, selectedTaskIndex + 1));
         useTuiStore.getState().setSelectedTaskIndex(next);
-        scrollToTaskRef.current(next);
+        if (next >= 0) scrollToTaskRef.current(next);
         return;
       }
       if (key.name === 'space') {
@@ -257,13 +257,13 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
         const tc = todosRef.current;
         if (task && tc) {
           if (task.status === 'Todo') {
-            void tc.updateByIdOrIndex(task.id, { status: 'In Progress' }).then(() =>
-              fetchTasksRef.current()
-            );
+            void tc.updateByIdOrIndex(task.id, { status: 'In Progress' })
+              .then(() => fetchTasksRef.current())
+              .catch(console.error);
           } else if (task.status === 'In Progress') {
-            void tc.completeByIdOrIndex(task.id).then(() =>
-              fetchTasksRef.current()
-            );
+            void tc.completeByIdOrIndex(task.id)
+              .then(() => fetchTasksRef.current())
+              .catch(console.error);
           }
         }
         return;
