@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- (Nothing yet.)
+### Fixed
+
+- **Local-first hydration**: `hydration.ts` now uses `listOpen()` instead of `listAll()` when
+  seeding the local snapshot, preventing Done tasks from appearing in the open-task list when
+  `NOTION_TODOS_STATUS` is a select column without `NOTION_TODOS_DONE_VALUE` configured.
+- **Log snapshot write-through**: `LocalLogsAdapter` now persists each log write directly to
+  `snapshot_logs` via `IEventQueue.upsertSnapshotLog`. Previously, once a log event was synced
+  to Notion (`synced=1`), it left `pendingSync()` but never reached the snapshot — after a
+  restart the projection lost visibility of that log, causing Pax to report "no log for today".
 
 ## [0.1.0] - (initial release)
 

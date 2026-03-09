@@ -7,7 +7,8 @@ export function getTuiLayoutMetrics(terminalSize: { width: number; height: numbe
   const chatContentWidth = chatColumnWidth - 6;
   const topbarContentWidth = terminalSize.width - 6;
   const inputMaxLines = terminalSize.height < 25 ? 2 : 3;
-  const maxTasksVisible = isWideScreen ? 10 : 8;
+  const maxTasksVisible = Math.max(3, terminalSize.height - inputMaxLines - 13);
+  const maxChatLines = Math.max(5, terminalSize.height - inputMaxLines - 10);
 
   return {
     isWideScreen,
@@ -18,5 +19,6 @@ export function getTuiLayoutMetrics(terminalSize: { width: number; height: numbe
     topbarContentWidth,
     inputMaxLines,
     maxTasksVisible,
+    maxChatLines,
   };
 }

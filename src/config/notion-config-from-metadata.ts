@@ -1,4 +1,5 @@
 import type { NotionConfig, NotionDbMetadata } from '../adapters/outbound/notion/client';
+import { DEFAULT_LOGS_COLUMNS } from '../adapters/outbound/notion/client';
 import type { AllowedNotionScope } from '../application/dto/metadata';
 
 /**
@@ -16,7 +17,10 @@ export function buildNotionConfigFromScope(
   const db: NotionDbMetadata = {
     logs: {
       databaseId: scope.logsDatabaseId,
-      columns: scope.logsColumns,
+      // Merge defaults under stored columns so new optional fields (sleepNotes,
+      // sleepMins, etc.) get their default Notion column names even when the
+      // stored scope pre-dates them. Stored values always win.
+      columns: { ...DEFAULT_LOGS_COLUMNS, ...scope.logsColumns },
     },
     todos: {
       databaseId: scope.todosDatabaseId,

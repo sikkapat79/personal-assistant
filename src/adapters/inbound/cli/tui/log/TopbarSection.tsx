@@ -32,7 +32,7 @@ export function TopbarSection({ contentWidth }: TopbarSectionProps) {
   const parts: string[] = [];
 
   if (todayLog.content.mood !== undefined) {
-    parts.push(`Mood: ${todayLog.content.mood}/10`);
+    parts.push(`Mood: ${todayLog.content.mood}/5`);
   }
 
   if (todayLog.content.energy !== undefined) {

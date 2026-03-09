@@ -15,13 +15,14 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'apply_log_update',
     description:
-      'Create or update the daily log for a date. Use this for all log writes. Three modes: (1) create: when no log exists; requires sleep_notes (or notes), mood, energy. Ask user only for sleep and mood; derive energy from daily check-in (sleep, mood, yesterday\'s overview via get_logs)—do not ask user for energy. For create: use the user\'s exact words for sleep_notes; do not invent or elaborate. Derive energy only from stated sleep and mood (simple mapping); do not fabricate. Optional title: base only on what they said. (2) single_field: when log exists and user mentioned one thing; requires field and value. (3) summarize: when log exists and user asks for end-of-day summary; requires score, title, went_well, improve, gratitude, tomorrow, energy. If no log exists, single_field and summarize return an error: create first with mode create.',
+      'Create or update the daily log for a date. Use this for all log writes. Three modes: (1) create: when no log exists; requires sleep_notes (or notes), mood, energy; optional sleep_mins (minutes slept). Ask user only for sleep and mood; derive energy from daily check-in (sleep, mood, yesterday\'s overview via get_logs)—do not ask user for energy. For create: use the user\'s exact words for sleep_notes; do not invent or elaborate. Derive energy only from stated sleep and mood (simple mapping); do not fabricate. Optional title: base only on what they said. (2) single_field: when log exists and user mentioned one thing; requires field and value. Supported fields include sleep_notes and sleep_mins. (3) summarize: when log exists and user asks for end-of-day summary; requires score, title, went_well, improve, gratitude, tomorrow, energy. If no log exists, single_field and summarize return an error: create first with mode create.',
     parameters: {
       type: 'object',
       properties: {
         date: { type: 'string' },
         mode: { type: 'string', enum: ['create', 'single_field', 'summarize'] },
         sleep_notes: { type: 'string' },
+        sleep_mins: { type: 'number' },
         notes: { type: 'string' },
         mood: { type: 'number' },
         energy: { type: 'number' },
@@ -40,7 +41,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'upsert_log',
     description:
-      'Create or update the daily journal for a date (one entry per day). Every field is meaningful—only send the field(s) the user mentioned; all other fields are preserved (e.g. "I did a workout" → set only workout: true; "worked 3 hours" → set only deep_work_hours: 3). Set a short, cool title when creating the first log for that day (e.g. from sleep/mood: "Good sleep · calm start"); when summarizing (end of day or user asks), you MUST call upsert_log with that date and ALL of: title, score, went_well, improve, gratitude, tomorrow, and energy if inferred; do not skip any of these fields. Params: date (YYYY-MM-DD), title, notes, score (1–10), mood (1–5), energy (1–100 = energy budget for that day; use yesterday’s overview via get_logs as one input when setting today’s budget), deep_work_hours (number), workout (boolean), diet (boolean), reading_mins (number), went_well, improve, gratitude, tomorrow. Gratitude: capture what the user said; do not reinterpret. Tomorrow: reprioritize from open tasks and recommend what to do next.',
+      'Deprecated for new logs — use apply_log_update with mode create instead. For updating existing logs only. Every field is meaningful—only send the field(s) the user mentioned; all other fields are preserved (e.g. "I did a workout" → set only workout: true; "worked 3 hours" → set only deep_work_hours: 3). Set a short, cool title when creating the first log for that day (e.g. from sleep/mood: "Good sleep · calm start"); when summarizing (end of day or user asks), you MUST call upsert_log with that date and ALL of: title, score, went_well, improve, gratitude, tomorrow, and energy if inferred; do not skip any of these fields. Params: date (YYYY-MM-DD), title, notes, score (1–10), mood (1–5), energy (1–100 = energy budget for that day; use yesterday’s overview via get_logs as one input when setting today’s budget), deep_work_hours (number), workout (boolean), diet (boolean), reading_mins (number), went_well, improve, gratitude, tomorrow. Gratitude: capture what the user said; do not reinterpret. Tomorrow: reprioritize from open tasks and recommend what to do next.',
     parameters: {
       type: 'object',
       properties: {

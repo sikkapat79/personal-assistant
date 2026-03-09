@@ -9,8 +9,13 @@ import dayjs from 'dayjs';
 const HYDRATION_LOOKBACK_DAYS = 90;
 
 /**
- * Pulls all todos and the last 90 days of logs from Notion, saves them to the
+ * Pulls open todos and the last 90 days of logs from Notion, saves them to the
  * local snapshot tables, then refreshes the in-memory projection.
+ *
+ * Uses listOpen() (not listAll()) so that the snapshot only contains tasks that
+ * are genuinely open — this avoids a doneKind mismatch bug where listAll()
+ * maps Done tasks as 'Todo' when the column is a select/status type rather
+ * than a checkbox and NOTION_TODOS_DONE_VALUE is not configured.
  *
  * Called once at startup in the background — does not block the app from
  * becoming ready.
@@ -27,7 +32,7 @@ export async function hydrateFromNotion(
   let todos: Todo[], logs: DailyLog[];
   try {
     [todos, logs] = await Promise.all([
-      notionTodos.listAll(),
+      notionTodos.listOpen(),
       notionLogs.findByDateRange(from, to),
     ]);
   } catch (err) {

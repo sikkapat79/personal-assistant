@@ -18,6 +18,10 @@ export interface LogsColumns {
   improve: string;
   gratitude: string;
   tomorrow: string;
+  /** Optional: only written/read when truthy. */
+  sleepNotes?: string;
+  /** Optional: only written/read when truthy. */
+  sleepMins?: string;
 }
 
 /** Column (property) names for the TODOs database. Override via NOTION_TODOS_* env. See notion-schema.ts for purpose and types. */
@@ -49,7 +53,7 @@ export interface NotionConfig {
   db: NotionDbMetadata;
 }
 
-const DEFAULT_LOGS_COLUMNS: LogsColumns = {
+export const DEFAULT_LOGS_COLUMNS: LogsColumns = {
   title: 'Title',
   date: 'Date',
   score: 'Score',
@@ -63,6 +67,8 @@ const DEFAULT_LOGS_COLUMNS: LogsColumns = {
   improve: 'Improve',
   gratitude: 'Gratitude',
   tomorrow: 'Tomorrow',
+  sleepNotes: 'Sleep Notes',
+  sleepMins: 'Sleep Mins',
 };
 
 const DEFAULT_TODOS_COLUMNS: TodosColumns = {
@@ -144,6 +150,8 @@ export interface NotionSettingsShape {
   NOTION_LOGS_IMPROVE?: string;
   NOTION_LOGS_GRATITUDE?: string;
   NOTION_LOGS_TOMORROW?: string;
+  NOTION_LOGS_SLEEP_NOTES?: string;
+  NOTION_LOGS_SLEEP_MINS?: string;
   NOTION_TODOS_TITLE?: string;
   NOTION_TODOS_CATEGORY?: string;
   NOTION_TODOS_DUE_DATE?: string;
@@ -178,6 +186,8 @@ function buildNotionConfigFrom(s: NotionSettingsShape): NotionConfig {
     improve: s.NOTION_LOGS_IMPROVE ?? DEFAULT_LOGS_COLUMNS.improve,
     gratitude: s.NOTION_LOGS_GRATITUDE ?? DEFAULT_LOGS_COLUMNS.gratitude,
     tomorrow: s.NOTION_LOGS_TOMORROW ?? DEFAULT_LOGS_COLUMNS.tomorrow,
+    sleepNotes: s.NOTION_LOGS_SLEEP_NOTES ?? DEFAULT_LOGS_COLUMNS.sleepNotes,
+    sleepMins: s.NOTION_LOGS_SLEEP_MINS ?? DEFAULT_LOGS_COLUMNS.sleepMins,
   };
   const doneValue = s.NOTION_TODOS_DONE_VALUE;
   const useStatus = doneValue != null && doneValue !== '';
@@ -232,6 +242,8 @@ export function buildNotionScopeFromSettings(s: NotionSettingsShape): {
     improve: s.NOTION_LOGS_IMPROVE ?? DEFAULT_LOGS_COLUMNS.improve,
     gratitude: s.NOTION_LOGS_GRATITUDE ?? DEFAULT_LOGS_COLUMNS.gratitude,
     tomorrow: s.NOTION_LOGS_TOMORROW ?? DEFAULT_LOGS_COLUMNS.tomorrow,
+    sleepNotes: s.NOTION_LOGS_SLEEP_NOTES ?? DEFAULT_LOGS_COLUMNS.sleepNotes,
+    sleepMins: s.NOTION_LOGS_SLEEP_MINS ?? DEFAULT_LOGS_COLUMNS.sleepMins,
   };
   const doneValue = s.NOTION_TODOS_DONE_VALUE;
   const useStatus = doneValue != null && doneValue !== '';
@@ -279,6 +291,8 @@ export function loadNotionConfig(): NotionConfig {
     NOTION_LOGS_IMPROVE: process.env.NOTION_LOGS_IMPROVE,
     NOTION_LOGS_GRATITUDE: process.env.NOTION_LOGS_GRATITUDE,
     NOTION_LOGS_TOMORROW: process.env.NOTION_LOGS_TOMORROW,
+    NOTION_LOGS_SLEEP_NOTES: process.env.NOTION_LOGS_SLEEP_NOTES,
+    NOTION_LOGS_SLEEP_MINS: process.env.NOTION_LOGS_SLEEP_MINS,
     NOTION_TODOS_TITLE: process.env.NOTION_TODOS_TITLE,
     NOTION_TODOS_CATEGORY: process.env.NOTION_TODOS_CATEGORY,
     NOTION_TODOS_DUE_DATE: process.env.NOTION_TODOS_DUE_DATE,
@@ -343,6 +357,8 @@ const LOGS_COLUMN_ENTRIES: ColumnMappingEntry[] = [
   { entity: 'logs', ourKey: 'improve', settingsKey: 'NOTION_LOGS_IMPROVE', defaultName: DEFAULT_LOGS_COLUMNS.improve },
   { entity: 'logs', ourKey: 'gratitude', settingsKey: 'NOTION_LOGS_GRATITUDE', defaultName: DEFAULT_LOGS_COLUMNS.gratitude },
   { entity: 'logs', ourKey: 'tomorrow', settingsKey: 'NOTION_LOGS_TOMORROW', defaultName: DEFAULT_LOGS_COLUMNS.tomorrow },
+  { entity: 'logs', ourKey: 'sleepNotes', settingsKey: 'NOTION_LOGS_SLEEP_NOTES', defaultName: DEFAULT_LOGS_COLUMNS.sleepNotes! },
+  { entity: 'logs', ourKey: 'sleepMins', settingsKey: 'NOTION_LOGS_SLEEP_MINS', defaultName: DEFAULT_LOGS_COLUMNS.sleepMins! },
 ];
 
 const TODOS_COLUMN_ENTRIES: ColumnMappingEntry[] = [

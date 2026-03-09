@@ -19,7 +19,6 @@ Field names and purposes here match the app's column mapping (see `notion-schema
 |----------------|--------|
 | date           | Log date (YYYY-MM-DD) |
 | title          | Short, memorable. Set on first log; update again when summarizing. |
-| notes          | Free-form notes; use for sleeping record on create. |
 | score          | 1–10 for that day (e.g. when summarizing). |
 | mood           | 1–5 (e.g. after waking). |
 | energy         | Energy budget for that day (1–100). Use yesterday's overview as one input. |
@@ -31,11 +30,13 @@ Field names and purposes here match the app's column mapping (see `notion-schema
 | improve        | What to improve (text). |
 | gratitude      | Gratitude (capture user words). |
 | tomorrow       | Recommended focus for next day (from tasks/context). |
+| sleepNotes     | Sleep notes (text) — what/how they slept. Preserved when summarizing. |
+| sleepMins      | Minutes slept that night (number). |
 
 **When calling apply_log_update:**  
-- **create:** `date` + `sleep_notes` (or `notes`) + `mood` + `energy`; optional `title`.  
-- **single_field:** `date` + `field` + `value` only. Log must already exist.  
-- **summarize:** `date` + all of score, title, went_well, improve, gratitude, tomorrow, energy (and notes if useful). Log must already exist.
+- **create:** `date` + `sleep_notes` + `sleep_mins` (optional) + `mood` + `energy`; optional `title`.
+- **single_field:** `date` + `field` + `value` only. Log must already exist.
+- **summarize:** `date` + all of score, title, went_well, improve, gratitude, tomorrow, energy. Log must already exist.
 
 ---
 
@@ -65,6 +66,8 @@ If there is no log entry for today, ask the user for a **daily check-in** (sleep
 **Before summarizing:** Select all tasks for that specific day to analyze: call `list_todos` with `include_done: true` and `for_date: <that date>` (YYYY-MM-DD) to get all undone and done tasks due that day. Use that list to inform went_well, improve, tomorrow, and your reply.
 
 Then follow **Mode 2** in `rules/data.md`: call `apply_log_update` with `mode: "summarize"` and **all** of: date, score, title, went_well, improve, gratitude, tomorrow, energy (and notes if useful). In your reply: short overall line + done & undone tasks for that day (from the list_todos result). The log must already exist (create first if not).
+
+**Do not preview or request confirmation.** Draft the values from what the user shared and call the tool immediately — never say "say 'save these' and I'll write it". The user can fix individual fields with single_field afterward.
 
 ---
 

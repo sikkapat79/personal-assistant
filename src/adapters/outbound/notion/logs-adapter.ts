@@ -76,10 +76,14 @@ export class NotionLogsAdapter implements ILogsRepository {
       [c.workout]: checkboxProp(content.workout),
       [c.diet]: checkboxProp(content.diet),
       [c.readingMins]: numberProp(content.readingMins),
-      [c.wentWell]: richTextProp(content.wentWell ?? content.notes ?? ''),
+      [c.wentWell]: richTextProp(content.wentWell ?? ''),
       [c.improve]: richTextProp(content.improve ?? ''),
       [c.gratitude]: richTextProp(content.gratitude ?? ''),
       [c.tomorrow]: richTextProp(content.tomorrow ?? ''),
+      // Optional columns: only include if column is configured AND a value exists.
+      // This prevents Notion API errors when the user hasn't added these columns yet.
+      ...(c.sleepNotes && content.sleepNotes ? { [c.sleepNotes]: richTextProp(content.sleepNotes) } : {}),
+      ...(c.sleepMins && content.sleepMins != null ? { [c.sleepMins]: numberProp(content.sleepMins) } : {}),
     };
     const client = this.client;
     const databaseId = this.databaseId;
@@ -103,7 +107,7 @@ function pageToLogContent(
 ): ReturnType<typeof createLogContent> {
   const title = extractTitle(props[c.title]);
   const wentWell = extractRichText(props[c.wentWell]);
-  return createLogContent(title, wentWell, {
+  return createLogContent(title, '', {
     score: extractNumber(props[c.score]),
     mood: extractNumber(props[c.mood]),
     energy: extractNumber(props[c.energy]),
@@ -115,6 +119,8 @@ function pageToLogContent(
     improve: extractRichText(props[c.improve]) || undefined,
     gratitude: extractRichText(props[c.gratitude]) || undefined,
     tomorrow: extractRichText(props[c.tomorrow]) || undefined,
+    sleepNotes: c.sleepNotes ? extractRichText(props[c.sleepNotes]) || undefined : undefined,
+    sleepMins: c.sleepMins ? extractNumber(props[c.sleepMins]) : undefined,
   });
 }
 

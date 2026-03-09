@@ -11,7 +11,8 @@ export function useChat(
   agent: AgentUseCase | null,
   renderer: ReturnType<typeof useRenderer>,
   fetchTodayLogRef: React.MutableRefObject<() => Promise<void>>,
-  terminalWidth: number
+  terminalWidth: number,
+  terminalHeight: number
 ): {
   submit: () => Promise<void>;
   getMaxChatScroll: () => number;
@@ -25,11 +26,10 @@ export function useChat(
 
   const getMaxChatScroll = useCallback(() => {
     const history = useTuiStore.getState().history;
-    const maxVisible = 15;
-    const { chatContentWidth } = getTuiLayoutMetrics({ width: terminalWidth, height: 24 });
+    const { chatContentWidth, maxChatLines } = getTuiLayoutMetrics({ width: terminalWidth, height: terminalHeight });
     const totalLines = calculateChatLineCount(history, chatContentWidth);
-    return Math.max(0, totalLines - maxVisible);
-  }, [terminalWidth]);
+    return Math.max(0, totalLines - maxChatLines);
+  }, [terminalWidth, terminalHeight]);
 
   const submit = useCallback(async () => {
     const { input, history, setInput, setThinking, appendHistory, setHistory } = useTuiStore.getState();

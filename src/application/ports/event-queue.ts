@@ -10,6 +10,8 @@ export interface IEventQueue {
   markSynced(ids: string[]): void;
   loadSnapshot(): { todos: Todo[]; logs: DailyLog[] };
   saveSnapshot(todos: Todo[], logs: DailyLog[]): void;
+  /** Write-through: upsert a single log into snapshot_logs without pruning other rows. */
+  upsertSnapshotLog(log: DailyLog): void;
   getEntityIdMap(): EntityIdMap;
   persistEntityIdMapping(localId: string, notionId: string): void;
 }

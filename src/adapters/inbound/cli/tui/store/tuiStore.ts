@@ -14,6 +14,8 @@ interface TuiStoreState {
   tasks: TodoItemDto[];
   loadingTasks: boolean;
   tasksScrollOffset: number;
+  selectedTaskIndex: number;
+  selectedTask: TodoItemDto | null;
   todayLog: DailyLog | null;
   loadingLog: boolean;
 }
@@ -31,6 +33,8 @@ interface TuiStoreActions {
   setTasks: (tasks: TodoItemDto[]) => void;
   setLoadingTasks: (loading: boolean) => void;
   setTasksScrollOffset: (updater: number | ((prev: number) => number)) => void;
+  setSelectedTaskIndex: (index: number) => void;
+  setSelectedTask: (task: TodoItemDto | null) => void;
   setTodayLog: (log: DailyLog | null) => void;
   setLoadingLog: (loading: boolean) => void;
 }
@@ -49,6 +53,8 @@ export const useTuiStore = create<TuiStore>((set) => ({
   tasks: [],
   loadingTasks: true,
   tasksScrollOffset: 0,
+  selectedTaskIndex: 0,
+  selectedTask: null,
   todayLog: null,
   loadingLog: true,
 
@@ -70,6 +76,8 @@ export const useTuiStore = create<TuiStore>((set) => ({
   setTasksScrollOffset: (updater) => set((s) => ({
     tasksScrollOffset: typeof updater === 'function' ? updater(s.tasksScrollOffset) : updater,
   })),
+  setSelectedTaskIndex: (index) => set({ selectedTaskIndex: index }),
+  setSelectedTask: (task) => set({ selectedTask: task }),
   setTodayLog: (log) => set({ todayLog: log }),
   setLoadingLog: (loading) => set({ loadingLog: loading }),
 }));

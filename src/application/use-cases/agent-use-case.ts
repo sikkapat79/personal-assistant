@@ -60,7 +60,7 @@ function parseSingleFieldValue(
     case 'diet':
       return bool !== undefined ? { diet: bool } : undefined;
     case 'mood':
-      return !Number.isNaN(num) && num >= 1 && num <= 5 ? { mood: Math.round(num) } : undefined;
+      return !Number.isNaN(num) && num >= 1 && num <= 5 ? { mood: num } : undefined;
     case 'energy':
       return !Number.isNaN(num) && num >= 1 && num <= 100 ? { energy: Math.round(num) } : undefined;
     case 'score':
@@ -73,6 +73,10 @@ function parseSingleFieldValue(
       return typeof v === 'string' && v.trim() !== '' ? { title: v.trim() } : undefined;
     case 'notes':
       return v !== undefined && v !== null ? { notes: String(v).trim() || undefined } : undefined;
+    case 'sleep_notes':
+      return typeof v === 'string' && v.trim() !== '' ? { sleepNotes: v.trim() } : undefined;
+    case 'sleep_mins':
+      return !Number.isNaN(num) && num >= 0 ? { sleepMins: Math.round(num) } : undefined;
     default:
       return undefined;
   }
@@ -257,11 +261,13 @@ export class AgentUseCase {
             if (energy === undefined) missing.push('energy budget');
             return `Error: Create requires ${missing.join(', ')}.`;
           }
+          const sleepMins = typeof args.sleep_mins === 'number' && Number.isFinite(args.sleep_mins) ? Math.round(args.sleep_mins) : undefined;
           const title = args.title !== undefined && String(args.title).trim() !== '' ? String(args.title).trim() : undefined;
           const result = await logUseCase.upsert({
             date,
             title,
-            notes: sleepNotes,
+            sleepNotes,
+            sleepMins,
             mood,
             energy,
           });

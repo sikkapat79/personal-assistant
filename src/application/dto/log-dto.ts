@@ -13,6 +13,8 @@ export interface LogInputDto {
   improve?: string;
   gratitude?: string;
   tomorrow?: string;
+  sleepNotes?: string;
+  sleepMins?: number;
 }
 
 export interface LogResultDto {
