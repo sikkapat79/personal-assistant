@@ -60,7 +60,7 @@ function parseSingleFieldValue(
     case 'diet':
       return bool !== undefined ? { diet: bool } : undefined;
     case 'mood':
-      return !Number.isNaN(num) && num >= 1 && num <= 5 ? { mood: Math.round(num) } : undefined;
+      return !Number.isNaN(num) && num >= 1 && num <= 5 ? { mood: num } : undefined;
     case 'energy':
       return !Number.isNaN(num) && num >= 1 && num <= 100 ? { energy: Math.round(num) } : undefined;
     case 'score':
