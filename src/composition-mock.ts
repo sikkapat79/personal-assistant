@@ -7,6 +7,16 @@ import { StubLLMAdapter } from './adapters/outbound/llm/stub-llm-adapter';
 import { LogUseCase } from './application/use-cases/log-use-case';
 import { TodosUseCase } from './application/use-cases/todos-use-case';
 import { AgentUseCase } from './application/use-cases/agent-use-case';
+import type { ISessionSummaryStore } from './application/ports/session-summary-store';
+
+/** No-op session store for mock/test environments (no SQLite). */
+const noopSessionStore: ISessionSummaryStore = {
+  load: () => null,
+  save: () => {},
+  saveMessage: () => {},
+  loadRecentMessages: () => [],
+  trimToLatest: () => {},
+};
 
 /**
  * Mock composition - uses sanitized fixture data instead of Notion API
@@ -20,7 +30,7 @@ export async function composeMock(): Promise<Composition> {
   const context = new FilesystemContextAdapter();
   const llm = new StubLLMAdapter();
   const metadataStore = new InMemoryMetadataStore();
-  const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore);
+  const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore, noopSessionStore);
 
   return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
 }

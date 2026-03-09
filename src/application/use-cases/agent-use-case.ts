@@ -3,6 +3,7 @@ import type { ITodosRepository } from '../ports/todos-repository';
 import type { IAgentContextPort } from '../ports/agent-context-port';
 import type { IMetadataStore } from '../ports/metadata-store';
 import type { ILLMPort, ChatMessage } from '../ports/llm-port';
+import type { ISessionSummaryStore } from '../ports/session-summary-store';
 import type { TodoPriority, TodoCategory, TodoStatus } from '../../domain/entities/todo';
 import type { DailyLog } from '../../domain/entities/daily-log';
 import type { Todo } from '../../domain/entities/todo';
@@ -88,8 +89,12 @@ export class AgentUseCase {
     private readonly todos: ITodosRepository,
     private readonly context: IAgentContextPort,
     private readonly llm: ILLMPort,
-    private readonly metadataStore: IMetadataStore
-  ) {}
+    private readonly metadataStore: IMetadataStore,
+    private readonly sessionStore: ISessionSummaryStore
+  ) {
+    this.persistedMessages = sessionStore.loadRecentMessages(AgentUseCase.RETENTION_MESSAGES);
+    this.cachedSessionSummary = sessionStore.load();
+  }
 
   /** Reply that looks like raw tool-call output should never be shown to the user. */
   private static readonly RAW_TOOL_CALL_PATTERN = /^\s*TOOL_CALLS?:\s*[\s\S]*/i;
@@ -97,29 +102,37 @@ export class AgentUseCase {
   private static readonly MAX_TOOL_ROUNDS = 5;
 
   /** Max recent messages to send in full; older messages are summarized when history exceeds this. */
-  private static readonly MAX_RECENT_MESSAGES = 16;
+  private static readonly MAX_RECENT_MESSAGES = 10;
+
+  /** How many raw messages to retain in SQLite across sessions (rolling window). */
+  private static readonly RETENTION_MESSAGES = 40;
 
   /** Length of the history prefix we have already summarized (cache is for history.slice(0, lastSummarizedIndex)). */
   private lastSummarizedIndex = 0;
 
-  /** Cached summary for that prefix; null when cache is invalid. */
+  /** Cached summary for that prefix; seeded from SQLite on construction for cross-session continuity. */
   private cachedSessionSummary: string | null = null;
+
+  /** Raw messages retained from previous sessions, prepended to current history for LLM context. */
+  private readonly persistedMessages: ChatMessage[];
 
   /**
    * Returns history to send to the LLM and an optional summary of older turns.
    * When history exceeds MAX_RECENT_MESSAGES, older part is summarized and only recent messages are kept.
-   * Uses incremental caching: only new messages are summarized and merged with the cached summary.
+   * Uses incremental caching: only new messages are re-merged with the cached snapshot (not appended as prose).
    */
   private async buildEffectiveHistory(
     history: ChatMessage[]
   ): Promise<{ effectiveHistory: ChatMessage[]; sessionSummary: string | null }> {
-    const recent = history.slice(-AgentUseCase.MAX_RECENT_MESSAGES);
-    if (history.length <= AgentUseCase.MAX_RECENT_MESSAGES) {
+    // Merge persisted messages from prior sessions with the current session's history
+    const fullHistory = [...this.persistedMessages, ...history];
+    const recent = fullHistory.slice(-AgentUseCase.MAX_RECENT_MESSAGES);
+    if (fullHistory.length <= AgentUseCase.MAX_RECENT_MESSAGES) {
       this.lastSummarizedIndex = 0;
-      this.cachedSessionSummary = null;
-      return { effectiveHistory: history, sessionSummary: null };
+      // Preserve the cross-session summary seed even when history is short
+      return { effectiveHistory: fullHistory, sessionSummary: this.cachedSessionSummary };
     }
-    const L = history.length - AgentUseCase.MAX_RECENT_MESSAGES;
+    const L = fullHistory.length - AgentUseCase.MAX_RECENT_MESSAGES;
     if (L < this.lastSummarizedIndex) {
       this.lastSummarizedIndex = 0;
       this.cachedSessionSummary = null;
@@ -127,22 +140,40 @@ export class AgentUseCase {
     if (L === this.lastSummarizedIndex && this.cachedSessionSummary !== null) {
       return { effectiveHistory: recent, sessionSummary: this.cachedSessionSummary };
     }
-    const oldPart = history.slice(0, L);
+    const oldPart = fullHistory.slice(0, L);
     let sessionSummary: string;
     if (this.lastSummarizedIndex === 0) {
       sessionSummary = await this.summarizeConversation(oldPart);
     } else {
-      const newSlice = history.slice(this.lastSummarizedIndex, L);
-      const newSummary = await this.summarizeConversation(newSlice);
-      sessionSummary = `${this.cachedSessionSummary} ${newSummary}`.trim();
+      const newSlice = fullHistory.slice(this.lastSummarizedIndex, L);
+      const newPartSummary = await this.summarizeConversation(newSlice);
+      sessionSummary = await this.remergeWithExisting(this.cachedSessionSummary!, newPartSummary);
     }
     this.lastSummarizedIndex = L;
     this.cachedSessionSummary = sessionSummary;
+    this.sessionStore.save(sessionSummary);
     return { effectiveHistory: recent, sessionSummary };
   }
 
+  /** Merges an existing state snapshot with a new partial summary into a single compact snapshot. */
+  private async remergeWithExisting(existing: string, newPart: string): Promise<string> {
+    const mergeMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You are updating a session state snapshot. Merge the existing snapshot with new events from the conversation, producing a single updated snapshot in the same structured format. Preserve all specifics (task titles, dates, values). Drop anything superseded by newer info.',
+      },
+      {
+        role: 'user',
+        content: `Existing snapshot:\n${existing}\n\nNew events:\n${newPart}`,
+      },
+    ];
+    const merged = await this.llm.chat(mergeMessages);
+    return (merged ?? '').trim() || existing;
+  }
+
   /**
-   * One LLM call (no tools) to summarize older conversation for context.
+   * One LLM call (no tools) to produce a structured state snapshot from older conversation turns.
    */
   private async summarizeConversation(messages: ChatMessage[]): Promise<string> {
     const transcript = messages
@@ -152,7 +183,12 @@ export class AgentUseCase {
       {
         role: 'system',
         content:
-          'Summarize this chat in 2–4 short sentences: what was decided, any tasks or todos added, and today\'s focus. Be concise.',
+          'Build a structured state snapshot from this conversation. Use this format:\n\n' +
+          '**Open tasks**: [task titles and statuses changed this session; omit section if none]\n' +
+          '**Log updates**: [date, fields set and their values; omit section if none]\n' +
+          '**Decisions**: [commitments, plans, deferred items; omit section if none]\n' +
+          '**User context**: [mood, energy, focus area, anything Pax should remember; omit section if none]\n\n' +
+          'Be specific — include task titles, exact dates, and numeric values. Skip small talk.',
       },
       { role: 'user', content: transcript },
     ];
@@ -174,7 +210,7 @@ export class AgentUseCase {
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...(sessionSummary
-        ? [{ role: 'system' as const, content: `Earlier in this session: ${sessionSummary}` }]
+        ? [{ role: 'system' as const, content: `Session context (earlier or prior sessions):\n${sessionSummary}` }]
         : []),
       ...effectiveHistory,
       { role: 'user', content: userMessage },
@@ -198,8 +234,11 @@ export class AgentUseCase {
       reply = await this.llm.chat(messages);
     }
     if (!reply || AgentUseCase.RAW_TOOL_CALL_PATTERN.test(reply.trim())) {
-      return "Done. I've taken care of that.";
+      reply = "Done. I've taken care of that.";
     }
+    this.sessionStore.saveMessage('user', userMessage);
+    this.sessionStore.saveMessage('assistant', reply);
+    this.sessionStore.trimToLatest(AgentUseCase.RETENTION_MESSAGES);
     return reply;
   }
 

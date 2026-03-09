@@ -17,6 +17,7 @@ import { ensureMetadataBootstrapped } from './config/metadata-bootstrap';
 import { buildNotionConfigFromScope } from './config/notion-config-from-metadata';
 import { getOrCreateMetadataDatabaseId } from './config/ensure-metadata-database';
 import { BunSqliteEventQueue } from './adapters/outbound/local/bun-sqlite-event-queue';
+import { SqliteSessionSummaryStore } from './adapters/outbound/local/sqlite-session-summary-store';
 import { LocalProjection } from './adapters/outbound/local/local-projection';
 import { LocalLogsAdapter } from './adapters/outbound/local/local-logs-adapter';
 import { LocalTodosAdapter } from './adapters/outbound/local/local-todos-adapter';
@@ -64,6 +65,7 @@ export async function compose(): Promise<Composition> {
   const dbPath = join(getConfigDir(), 'pax.db');
   const eventQueue = new BunSqliteEventQueue(dbPath);
   eventQueue.migrate();
+  const sessionStore = new SqliteSessionSummaryStore(dbPath);
 
   const projection = new LocalProjection();
   const deviceId = getDeviceId();
@@ -97,6 +99,6 @@ export async function compose(): Promise<Composition> {
     apiKey && apiKey.length > 0
       ? new OpenAILLMAdapter(apiKey, settings.OPENAI_MODEL ?? undefined)
       : new StubLLMAdapter();
-  const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore);
+  const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore, sessionStore);
   return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
 }
