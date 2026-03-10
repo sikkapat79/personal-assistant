@@ -39,6 +39,19 @@ export type TodosDoneKind =
   | { type: 'checkbox' }
   | { type: 'status'; doneValue: string; openValue: string; inProgressValue?: string };
 
+/** Scope for allowed Notion DBs and optional parent pages; used to build NotionConfig from metadata. */
+export interface AllowedNotionScope {
+  logsDatabaseId: string;
+  todosDatabaseId: string;
+  allowedPageParentIds?: string[];
+  extraDatabaseIds?: string[];
+  logsPurpose?: string;
+  todosPurpose?: string;
+  logsColumns?: LogsColumns;
+  todosColumns?: TodosColumns;
+  todosDoneKind?: TodosDoneKind;
+}
+
 /** DB metadata for both Notion databases, loaded from .env (IDs + column mapping). */
 export interface NotionDbMetadata {
   logs: { databaseId: string; columns: LogsColumns };

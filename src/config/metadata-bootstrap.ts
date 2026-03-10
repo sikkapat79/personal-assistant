@@ -2,9 +2,9 @@ import type { LogsColumns, TodosColumns, TodosDoneKind } from '../adapters/outbo
 import { buildNotionScopeFromSettings } from '../adapters/outbound/notion/client';
 import { getColumnPurpose } from '../adapters/outbound/notion/notion-schema';
 import type { NotionSettingsShape } from '../adapters/outbound/notion/client';
-import type { IMetadataStore } from '../application/ports/metadata-store';
-import type { AllowedNotionScope } from '../application/dto/metadata';
-import type { DatabaseSchema } from '../domain/metadata';
+import type { IMetadataStore } from '../application/shared/metadata-store.port';
+import type { AllowedNotionScope } from '../adapters/outbound/notion/client';
+import type { DatabaseSchema } from '@domain/shared/metadata';
 
 const LOGS_NOTION_TYPES: Record<keyof LogsColumns, string> = {
   title: 'title',

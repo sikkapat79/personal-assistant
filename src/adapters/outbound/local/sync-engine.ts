@@ -1,11 +1,11 @@
-import type { IEventQueue } from '../../../application/ports/event-queue';
-import type { StoredEvent, TodoCreatedPayload, DailyLogUpsertedPayload } from '../../../application/ports/event-types';
-import { EntityType, EventType } from '../../../application/ports/event-types';
+import type { IEventQueue } from '@app/shared/event-queue.port';
+import type { StoredEvent, TodoCreatedPayload, DailyLogUpsertedPayload } from '@app/shared/event-types';
+import { EntityType, EventType } from '@app/shared/event-types';
 import type { NotionLogsAdapter } from '../notion/logs-adapter';
 import type { NotionTodosAdapter } from '../notion/todos-adapter';
-import { createTodo } from '../../../domain/entities/todo';
-import { createLogContent } from '../../../domain/value-objects/log-content';
-import { createDailyLog } from '../../../domain/entities/daily-log';
+import { createTodo } from '@domain/todo/todo';
+import { createLogContent } from '@domain/log/log-content';
+import { createDailyLog } from '@domain/log/daily-log';
 
 const SYNC_INTERVAL_MS = 10_000;
 

@@ -4,7 +4,7 @@ import { useSpinner } from './useSpinner';
 import { clearConsole } from '../utils/clearConsole';
 import { calculateChatLineCount } from '../utils/wrapText';
 import { getTuiLayoutMetrics } from '../utils/layoutMetrics';
-import type { AgentUseCase } from '../../../../../application/use-cases/agent-use-case';
+import type { AgentUseCase } from '@app/agent/agent-use-case';
 import { useTuiStore } from '../store/tuiStore';
 
 export function useChat(

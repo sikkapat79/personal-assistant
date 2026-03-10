@@ -1,13 +1,13 @@
 import type {
   ITodosRepository,
   TodoUpdatePatch,
-} from '../../../application/ports/todos-repository';
-import type { Todo, TodoStatus } from '../../../domain/entities/todo';
-import type { TodoId } from '../../../domain/value-objects/todo-id';
-import type { TodoCategory, TodoPriority } from '../../../domain/entities/todo';
+} from '@app/todo/todos-repository.port';
+import type { Todo, TodoStatus } from '@domain/todo/todo';
+import type { TodoId } from '@domain/todo/todo-id';
+import type { TodoCategory, TodoPriority } from '@domain/todo/todo';
 import type { TodosColumns, TodosDoneKind } from './client';
-import { createTodo } from '../../../domain/entities/todo';
-import { createTodoId } from '../../../domain/value-objects/todo-id';
+import { createTodo } from '@domain/todo/todo';
+import { createTodoId } from '@domain/todo/todo-id';
 import { getNotionClient, fetchTodosDoneOptions } from './client';
 
 /** Notion adapter for TODOs: uses database_id and full column mapping from config. Supports Done as checkbox or Status (select). */

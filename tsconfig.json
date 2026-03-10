@@ -13,7 +13,12 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    "paths": {
+      "@domain/*": ["./src/domain/*"],
+      "@app/*": ["./src/application/*"],
+      "@adapters/*": ["./src/adapters/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
-import type { ISessionSummaryStore } from '../../../application/ports/session-summary-store';
-import type { ChatMessage } from '../../../application/ports/llm-port';
+import type { ISessionSummaryStore } from '@app/agent/session-summary-store.port';
+import type { ChatMessage } from '@app/agent/chat-message';
 
 interface MessageRow {
   role: string;

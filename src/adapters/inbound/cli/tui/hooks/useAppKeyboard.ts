@@ -7,8 +7,8 @@ import { SETUP_STEPS, SETTINGS_STEPS } from '../constants/setup';
 import { getResolvedConfig, hasRequiredConfig } from '../../../../../config/resolved';
 import type { Page } from '../types';
 import { useTuiStore } from '../store/tuiStore';
-import type { TodosUseCase } from '../../../../../application/use-cases/todos-use-case';
-import type { TodoId } from '../../../../../domain/value-objects/todo-id';
+import type { TodosUseCase } from '@app/todo/todos-use-case';
+import type { TodoId } from '@domain/todo/todo-id';
 
 interface AppKeyboardParams {
   // read values — will be mirrored to refs internally

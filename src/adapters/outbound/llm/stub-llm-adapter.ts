@@ -1,4 +1,4 @@
-import type { ILLMPort, ChatMessage } from '../../../application/ports/llm-port';
+import type { ILLMPort, ChatMessage } from '@app/agent/llm.port';
 import { AGENT_NAME } from '../../../config/branding';
 
 /** Stub LLM: returns a fixed message. Use when no API key is set. */

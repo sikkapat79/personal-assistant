@@ -1,13 +1,13 @@
-import type { ITodosRepository, TodoUpdatePatch } from '../../../application/ports/todos-repository';
-import type { IEventQueue } from '../../../application/ports/event-queue';
-import type { Todo } from '../../../domain/entities/todo';
-import type { TodoId } from '../../../domain/value-objects/todo-id';
+import type { ITodosRepository, TodoUpdatePatch } from '@app/todo/todos-repository.port';
+import type { IEventQueue } from '@app/shared/event-queue.port';
+import type { Todo } from '@domain/todo/todo';
+import type { TodoId } from '@domain/todo/todo-id';
 import type { StoredEvent, TodoCreatedPayload, TodoUpdatedPayload } from './event-types';
 import { EntityType, EventType } from './event-types';
 import { LocalAdapterBase } from './local-adapter-base';
 import { LocalProjection } from './local-projection';
 import { SyncEngine } from './sync-engine';
-import { createTodo } from '../../../domain/entities/todo';
+import { createTodo } from '@domain/todo/todo';
 
 export class LocalTodosAdapter extends LocalAdapterBase implements ITodosRepository {
   constructor(

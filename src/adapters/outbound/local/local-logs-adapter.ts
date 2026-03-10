@@ -1,14 +1,14 @@
-import type { ILogsRepository } from '../../../application/ports/logs-repository';
-import type { IEventQueue } from '../../../application/ports/event-queue';
-import type { DailyLog } from '../../../domain/entities/daily-log';
-import type { LogDate } from '../../../domain/value-objects/log-date';
+import type { ILogsRepository } from '@app/log/logs-repository.port';
+import type { IEventQueue } from '@app/shared/event-queue.port';
+import type { DailyLog } from '@domain/log/daily-log';
+import type { LogDate } from '@domain/log/log-date';
 import type { StoredEvent, DailyLogUpsertedPayload } from './event-types';
 import { EntityType, EventType } from './event-types';
 import { LocalAdapterBase } from './local-adapter-base';
 import { LocalProjection } from './local-projection';
 import { SyncEngine } from './sync-engine';
-import { createDailyLog } from '../../../domain/entities/daily-log';
-import { createLogContent } from '../../../domain/value-objects/log-content';
+import { createDailyLog } from '@domain/log/daily-log';
+import { createLogContent } from '@domain/log/log-content';
 
 export class LocalLogsAdapter extends LocalAdapterBase implements ILogsRepository {
   constructor(

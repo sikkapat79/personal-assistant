@@ -1,6 +1,6 @@
-import type { ILogsRepository } from '../../../application/ports/logs-repository';
-import type { DailyLog } from '../../../domain/entities/daily-log';
-import type { LogDate } from '../../../domain/value-objects/log-date';
+import type { ILogsRepository } from '@app/log/logs-repository.port';
+import type { DailyLog } from '@domain/log/daily-log';
+import type { LogDate } from '@domain/log/log-date';
 import mockDataJson from '../../../../fixtures/mock-data.json';
 
 /**

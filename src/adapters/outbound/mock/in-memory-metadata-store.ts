@@ -2,9 +2,9 @@ import type {
   ProvenanceEntry,
   SyncState,
   DatabaseSchema,
-} from '../../../domain/metadata';
-import type { AllowedNotionScope } from '../../../application/dto/metadata';
-import type { IMetadataStore } from '../../../application/ports/metadata-store';
+} from '@domain/shared/metadata';
+import type { AllowedNotionScope } from '../notion/client';
+import type { IMetadataStore } from '@app/shared/metadata-store.port';
 
 /**
  * In-memory implementation of IMetadataStore. No file I/O.

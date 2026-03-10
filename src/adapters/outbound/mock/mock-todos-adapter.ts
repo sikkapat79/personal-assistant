@@ -1,8 +1,8 @@
-import type { ITodosRepository } from '../../../application/ports/todos-repository';
-import type { TodoUpdatePatch } from '../../../application/ports/todo-update-patch';
-import type { Todo, TodoStatus, TodoCategory, TodoPriority } from '../../../domain/entities/todo';
-import type { TodoId } from '../../../domain/value-objects/todo-id';
-import { createTodo } from '../../../domain/entities/todo';
+import type { ITodosRepository } from '@app/todo/todos-repository.port';
+import type { TodoUpdatePatch } from '@app/todo/todo-update-patch';
+import type { Todo, TodoStatus, TodoCategory, TodoPriority } from '@domain/todo/todo';
+import type { TodoId } from '@domain/todo/todo-id';
+import { createTodo } from '@domain/todo/todo';
 import mockDataJson from '../../../../fixtures/mock-data.json';
 
 const VALID_STATUSES: TodoStatus[] = ['Todo', 'In Progress', 'Done'];

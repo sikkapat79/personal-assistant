@@ -4,10 +4,10 @@ import { MockTodosAdapter } from './adapters/outbound/mock/mock-todos-adapter';
 import { InMemoryMetadataStore } from './adapters/outbound/mock/in-memory-metadata-store';
 import { FilesystemContextAdapter } from './adapters/outbound/context/filesystem-context-adapter';
 import { StubLLMAdapter } from './adapters/outbound/llm/stub-llm-adapter';
-import { LogUseCase } from './application/use-cases/log-use-case';
-import { TodosUseCase } from './application/use-cases/todos-use-case';
-import { AgentUseCase } from './application/use-cases/agent-use-case';
-import type { ISessionSummaryStore } from './application/ports/session-summary-store';
+import { LogUseCase } from './application/log/log-use-case';
+import { TodosUseCase } from './application/todo/todos-use-case';
+import { AgentUseCase } from './application/agent/agent-use-case';
+import type { ISessionSummaryStore } from './application/agent/session-summary-store.port';
 
 /** No-op session store for mock/test environments (no SQLite). */
 const noopSessionStore: ISessionSummaryStore = {
