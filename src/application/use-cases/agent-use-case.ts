@@ -94,6 +94,12 @@ export class AgentUseCase {
   ) {
     this.persistedMessages = sessionStore.loadRecentMessages(AgentUseCase.RETENTION_MESSAGES);
     this.cachedSessionSummary = sessionStore.load();
+    // Seed the summarization index so we don't re-summarize raw-retained messages on the first
+    // turn after a restart. Messages older than MAX_RECENT_MESSAGES are "already handled" — either
+    // by the persisted summary (true overflow) or by the raw retention window itself.
+    if (this.persistedMessages.length > AgentUseCase.MAX_RECENT_MESSAGES) {
+      this.lastSummarizedIndex = this.persistedMessages.length - AgentUseCase.MAX_RECENT_MESSAGES;
+    }
   }
 
   /** Reply that looks like raw tool-call output should never be shown to the user. */
@@ -137,7 +143,9 @@ export class AgentUseCase {
       this.lastSummarizedIndex = 0;
       this.cachedSessionSummary = null;
     }
-    if (L === this.lastSummarizedIndex && this.cachedSessionSummary !== null) {
+    if (L === this.lastSummarizedIndex) {
+      // Already at the right boundary — return whatever summary we have (may be null when retained
+      // messages provide raw context and no true overflow has occurred yet).
       return { effectiveHistory: recent, sessionSummary: this.cachedSessionSummary };
     }
     const oldPart = fullHistory.slice(0, L);
@@ -151,7 +159,11 @@ export class AgentUseCase {
     }
     this.lastSummarizedIndex = L;
     this.cachedSessionSummary = sessionSummary;
-    this.sessionStore.save(sessionSummary);
+    // Only persist when turns have actually fallen out of the raw retention window.
+    // Within-session in-memory summaries overlap with retained raw messages and must not be stored.
+    if (L > AgentUseCase.RETENTION_MESSAGES) {
+      this.sessionStore.save(sessionSummary);
+    }
     return { effectiveHistory: recent, sessionSummary };
   }
 

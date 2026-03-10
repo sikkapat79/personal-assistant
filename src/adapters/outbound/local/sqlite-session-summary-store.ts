@@ -7,6 +7,10 @@ interface MessageRow {
   content: string;
 }
 
+function isValidRole(role: string): role is 'user' | 'assistant' {
+  return role === 'user' || role === 'assistant';
+}
+
 export class SqliteSessionSummaryStore implements ISessionSummaryStore {
   private readonly db: Database;
 
@@ -45,7 +49,7 @@ export class SqliteSessionSummaryStore implements ISessionSummaryStore {
       )
       .all(limit) as MessageRow[];
     // Rows are newest-first from DESC; reverse to get oldest-first for LLM context
-    return rows.reverse().map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content }));
+    return rows.reverse().flatMap((r) => (isValidRole(r.role) ? [{ role: r.role, content: r.content }] : []));
   }
 
   trimToLatest(limit: number): void {

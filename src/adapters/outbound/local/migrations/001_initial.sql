@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS session_summary (
 -- Rolling message log for cross-session retention (last N messages kept)
 CREATE TABLE IF NOT EXISTS session_messages (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  role       TEXT NOT NULL,    -- 'user' | 'assistant'
+  role       TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
   content    TEXT NOT NULL,
   created_at TEXT NOT NULL     -- ISO 8601
 );
