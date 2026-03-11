@@ -21,6 +21,8 @@ export class AgentUseCase {
   private readonly toolDeps: ToolDeps;
   private readonly llm: ILLMPort;
   private readonly sessionStore: ISessionSummaryStore;
+  private cachedContext: Awaited<ReturnType<IAgentContextPort['getContext']>> | null = null;
+  private cachedSchemaSummary: string | null | undefined = undefined;
 
   constructor(
     private readonly logs: ILogsRepository,
@@ -38,12 +40,16 @@ export class AgentUseCase {
 
   async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
     const todayDate = todayLogDate();
-    const [ctx, todayLog, openTodos, schemaSummary] = await Promise.all([
-      this.context.getContext(),
+    if (!this.cachedContext) this.cachedContext = await this.context.getContext();
+    if (this.cachedSchemaSummary === undefined) {
+      this.cachedSchemaSummary = await buildSchemaSummary(this.toolDeps.metadataStore);
+    }
+    const [todayLog, openTodos] = await Promise.all([
       this.logs.findByDate(todayDate),
       this.todos.listOpen(),
-      buildSchemaSummary(this.toolDeps.metadataStore),
     ]);
+    const ctx = this.cachedContext;
+    const schemaSummary = this.cachedSchemaSummary;
     const currentState = buildCurrentStateSnapshot(todayDate, todayLog, openTodos);
     const systemPrompt = buildSystemPrompt(ctx, todayDate, currentState, schemaSummary);
     const { effectiveHistory, sessionSummary } = await this.historyManager.buildEffectiveHistory(history);
@@ -71,6 +77,7 @@ export class AgentUseCase {
       rounds++;
     }
     if (reply && RAW_TOOL_CALL_PATTERN.test(reply.trim())) {
+      messages.push({ role: 'assistant', content: reply });
       reply = await this.llm.chat(messages);
     }
     if (!reply || RAW_TOOL_CALL_PATTERN.test(reply.trim())) {

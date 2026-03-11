@@ -45,6 +45,6 @@ export function buildSystemPrompt(
     ctx.rules,
   );
   if (ctx.skills.length) parts.push('\n## Skills\n' + ctx.skills.join('\n'));
-  if (ctx.docs.length) parts.push('\n## Docs (reference)\n' + ctx.docs.slice(0, 3).join('\n'));
+  if (ctx.docs.length) parts.push('\n## Docs (reference)\n' + ctx.docs.join('\n'));
   return parts.join('\n');
 }

@@ -27,8 +27,11 @@ export function parseSingleFieldValue(
       return !Number.isNaN(num) && num >= 0 ? { readingMins: Math.round(num) } : undefined;
     case 'title':
       return typeof v === 'string' && v.trim() !== '' ? { title: v.trim() } : undefined;
-    case 'notes':
-      return v !== undefined && v !== null ? { notes: String(v).trim() || undefined } : undefined;
+    case 'notes': {
+      if (v === undefined || v === null) return undefined;
+      const s = String(v).trim();
+      return s ? { notes: s } : undefined;
+    }
     case 'sleep_notes':
       return typeof v === 'string' && v.trim() !== '' ? { sleepNotes: v.trim() } : undefined;
     case 'sleep_mins':

@@ -1,9 +1,8 @@
 import type { TodoStatus } from '@domain/todo/todo';
 import { VALID_STATUSES } from './agent-constants';
 
-export function parseStatus(value: unknown): TodoStatus {
-  if (typeof value !== 'string') return 'Todo';
+export function parseStatus(value: unknown): TodoStatus | undefined {
+  if (typeof value !== 'string') return undefined;
   const s = value.trim();
-  const match = VALID_STATUSES.find((x) => x.toLowerCase() === s.toLowerCase());
-  return match ?? 'Todo';
+  return VALID_STATUSES.find((x) => x.toLowerCase() === s.toLowerCase());
 }

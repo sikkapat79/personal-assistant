@@ -15,16 +15,16 @@ export function parseToolCalls(reply: string): ToolCall[] {
   let depth = 1;
   let end = jsonStart + 1;
   let inString = false;
-  let escape = false;
+  let isEscaped = false;
   let quoteChar = '';
   for (; end < afterPrefix.length && depth > 0; end++) {
     const c = afterPrefix[end];
-    if (escape) {
-      escape = false;
+    if (isEscaped) {
+      isEscaped = false;
       continue;
     }
     if (c === '\\' && inString) {
-      escape = true;
+      isEscaped = true;
       continue;
     }
     if ((c === '"' || c === "'") && !inString) {

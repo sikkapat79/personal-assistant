@@ -4,6 +4,7 @@ import type { ToolDeps } from '../tool-deps';
 export async function handleUpsertLog(args: Record<string, unknown>, deps: ToolDeps): Promise<string> {
   const logUseCase = new LogUseCase(deps.logs);
   const date = String(args.date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return `Error: date is required in YYYY-MM-DD format.`;
   const title = args.title !== undefined && args.title !== '' ? String(args.title) : undefined;
   const notes = args.notes !== undefined && args.notes !== '' ? String(args.notes) : undefined;
   const score = typeof args.score === 'number' && Number.isFinite(args.score) ? args.score : undefined;

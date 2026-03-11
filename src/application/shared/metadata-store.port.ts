@@ -3,7 +3,7 @@ import type {
   SyncState,
   DatabaseSchema,
 } from '@domain/shared/metadata';
-import type { AllowedNotionScope } from '@adapters/outbound/notion/client';
+import type { AllowedNotionScope } from './notion-scope';
 
 export interface IMetadataStore {
   recordProvenance(entry: ProvenanceEntry): Promise<void>;

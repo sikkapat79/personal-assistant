@@ -13,7 +13,7 @@ export class SessionHistoryManager {
   ) {
     this.persistedMessages = sessionStore.loadRecentMessages(RETENTION_MESSAGES);
     this.cachedSessionSummary = sessionStore.load();
-    if (this.persistedMessages.length > MAX_RECENT_MESSAGES) {
+    if (this.persistedMessages.length > MAX_RECENT_MESSAGES && this.cachedSessionSummary !== null) {
       this.lastSummarizedIndex = this.persistedMessages.length - MAX_RECENT_MESSAGES;
     }
   }
@@ -55,11 +55,7 @@ export class SessionHistoryManager {
     }
     this.lastSummarizedIndex = L;
     this.cachedSessionSummary = sessionSummary;
-    // Only persist when turns have actually fallen out of the raw retention window.
-    // Within-session in-memory summaries overlap with retained raw messages and must not be stored.
-    if (L > RETENTION_MESSAGES) {
-      this.sessionStore.save(sessionSummary);
-    }
+    this.sessionStore.save(sessionSummary);
     return { effectiveHistory: recent, sessionSummary };
   }
 

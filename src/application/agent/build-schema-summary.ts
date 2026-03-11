@@ -8,7 +8,7 @@ export async function buildSchemaSummary(store: IMetadataStore): Promise<string 
   if (scope.logsDatabaseId) dbIds.push({ id: scope.logsDatabaseId, label: scope.logsPurpose ?? 'Logs' });
   if (scope.todosDatabaseId) dbIds.push({ id: scope.todosDatabaseId, label: scope.todosPurpose ?? 'Todos' });
   if (scope.extraDatabaseIds?.length) {
-    scope.extraDatabaseIds.forEach((id) => dbIds.push({ id, label: id }));
+    scope.extraDatabaseIds.forEach((id) => { dbIds.push({ id, label: id }); });
   }
   if (dbIds.length === 0) return null;
   const parts: string[] = [];

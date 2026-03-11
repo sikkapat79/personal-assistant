@@ -5,6 +5,7 @@ import type { ToolDeps } from '../tool-deps';
 export async function handleApplyLogUpdate(args: Record<string, unknown>, deps: ToolDeps): Promise<string> {
   const logUseCase = new LogUseCase(deps.logs);
   const date = String(args.date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return `Error: Invalid date "${date}". Use YYYY-MM-DD format.`;
   const mode = String(args.mode ?? '');
   const existing = await deps.logs.findByDate(date);
 
@@ -18,8 +19,8 @@ export async function handleApplyLogUpdate(args: Record<string, unknown>, deps: 
         : args.notes !== undefined && String(args.notes).trim() !== ''
           ? String(args.notes).trim()
           : undefined;
-    const mood = typeof args.mood === 'number' && Number.isFinite(args.mood) ? args.mood : undefined;
-    const energy = typeof args.energy === 'number' && Number.isFinite(args.energy) ? args.energy : undefined;
+    const mood = typeof args.mood === 'number' && Number.isFinite(args.mood) && args.mood >= 1 && args.mood <= 5 ? args.mood : undefined;
+    const energy = typeof args.energy === 'number' && Number.isFinite(args.energy) && args.energy >= 1 && args.energy <= 100 ? args.energy : undefined;
     if (!sleepNotes || mood === undefined || energy === undefined) {
       const missing: string[] = [];
       if (!sleepNotes) missing.push('sleeping record (sleep_notes or notes)');
@@ -54,13 +55,13 @@ export async function handleApplyLogUpdate(args: Record<string, unknown>, deps: 
     if (!existing) {
       return 'Error: No log for this date. Create it first (sleep, mood, energy) using mode create.';
     }
-    const score = typeof args.score === 'number' && Number.isFinite(args.score) ? args.score : undefined;
+    const score = typeof args.score === 'number' && Number.isFinite(args.score) && args.score >= 1 && args.score <= 10 ? args.score : undefined;
     const title = args.title !== undefined && String(args.title).trim() !== '' ? String(args.title).trim() : undefined;
     const wentWell = args.went_well !== undefined && args.went_well !== '' ? String(args.went_well) : undefined;
     const improve = args.improve !== undefined && args.improve !== '' ? String(args.improve) : undefined;
     const gratitude = args.gratitude !== undefined && args.gratitude !== '' ? String(args.gratitude) : undefined;
     const tomorrow = args.tomorrow !== undefined && args.tomorrow !== '' ? String(args.tomorrow) : undefined;
-    const energy = typeof args.energy === 'number' && Number.isFinite(args.energy) ? args.energy : undefined;
+    const energy = typeof args.energy === 'number' && Number.isFinite(args.energy) && args.energy >= 1 && args.energy <= 100 ? args.energy : undefined;
     if (score === undefined || !title || !wentWell || !improve || !gratitude || !tomorrow || energy === undefined) {
       const missing: string[] = [];
       if (score === undefined) missing.push('score');

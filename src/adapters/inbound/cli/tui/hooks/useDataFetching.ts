@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from 'react';
-import { todayLogDate, createLogDate } from '@domain/log/log-date';
-import type { ILogsRepository } from '@app/log/logs-repository.port';
+import { todayLogDate, createLogDate } from '../../../../../domain/log/log-date';
+import type { ILogsRepository } from '../../../../../application/log/logs-repository.port';
 import { wrapText } from '../utils/wrapText';
 import { getTuiLayoutMetrics } from '../utils/layoutMetrics';
-import type { TodosUseCase } from '@app/todo/todos-use-case';
+import type { TodosUseCase } from '../../../../../application/todo/todos-use-case';
 import { useTuiStore } from '../store/tuiStore';
 
 
