@@ -16,6 +16,7 @@ const noopSessionStore: ISessionSummaryStore = {
   saveMessage: () => {},
   loadRecentMessages: () => [],
   trimToLatest: () => {},
+  clearSession: () => {},
 };
 
 /**

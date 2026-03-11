@@ -46,6 +46,11 @@ export function useChat(
 
     if (line === '/clear') {
       setHistory([]);
+      try {
+        agent?.clearHistory();
+      } catch (e) {
+        appendHistory([{ role: 'assistant', content: `Failed to clear session: ${e instanceof Error ? e.message : String(e)}` }]);
+      }
       return;
     }
 

@@ -11,4 +11,6 @@ export interface ISessionSummaryStore {
   loadRecentMessages(limit: number): ChatMessage[];
   /** Delete messages beyond the most recent `limit` to keep the table bounded. */
   trimToLatest(limit: number): void;
+  /** Clear all persisted session data (messages and summary). */
+  clearSession(): void;
 }

@@ -60,4 +60,11 @@ export class SqliteSessionSummaryStore implements ISessionSummaryStore {
       )
       .run(limit);
   }
+
+  clearSession(): void {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM session_messages').run();
+      this.db.prepare('DELETE FROM session_summary').run();
+    })();
+  }
 }

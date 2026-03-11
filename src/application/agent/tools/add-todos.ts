@@ -14,7 +14,8 @@ export async function handleAddTodos(args: Record<string, unknown>, deps: ToolDe
       t !== null && typeof t === 'object' && 'title' in t && String((t as { title?: unknown }).title ?? '').trim() !== ''
   );
   if (validTasks.length === 0) return 'No valid tasks to add.';
-  const results: string[] = [];
+  const added: string[] = [];
+  const failed: string[] = [];
   for (const t of validTasks) {
     const title = String((t as { title?: unknown }).title ?? '').trim();
     const category = parseCategory((t as { category?: unknown }).category) ?? DEFAULT_CATEGORY;
@@ -26,13 +27,20 @@ export async function handleAddTodos(args: Record<string, unknown>, deps: ToolDe
       : undefined;
     const priority = parsePriority((t as { priority?: unknown }).priority);
     const status = parseStatus((t as { status?: unknown }).status) ?? 'Todo';
-    await todosUseCase.add({ title, category, dueDate, notes, priority, status });
-    const extra: string[] = [];
-    if (status !== 'Todo') extra.push(status);
-    if (dueDate) extra.push(`due ${dueDate}`);
-    if (notes) extra.push('notes');
-    if (priority) extra.push(priority);
-    results.push(extra.length ? `"${title}" [${category}] (${extra.join(', ')})` : `"${title}" [${category}]`);
+    try {
+      await todosUseCase.add({ title, category, dueDate, notes, priority, status });
+      const extra: string[] = [];
+      if (status !== 'Todo') extra.push(status);
+      if (dueDate) extra.push(`due ${dueDate}`);
+      if (notes) extra.push('notes');
+      if (priority) extra.push(priority);
+      added.push(extra.length ? `"${title}" [${category}] (${extra.join(', ')})` : `"${title}" [${category}]`);
+    } catch (err) {
+      failed.push(`"${title}" — ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
-  return `Added ${results.length} task${results.length === 1 ? '' : 's'}: ${results.join(', ')}.`;
+  const parts: string[] = [];
+  if (added.length > 0) parts.push(`Added ${added.length} task${added.length === 1 ? '' : 's'}: ${added.join(', ')}.`);
+  if (failed.length > 0) parts.push(`Failed ${failed.length}: ${failed.join(', ')}.`);
+  return parts.join(' ');
 }

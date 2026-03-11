@@ -38,6 +38,10 @@ export class AgentUseCase {
     this.historyManager = new SessionHistoryManager(llm, sessionStore);
   }
 
+  clearHistory(): void {
+    this.historyManager.reset();
+  }
+
   async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
     const todayDate = todayLogDate();
     if (!this.cachedContext) this.cachedContext = await this.context.getContext();

@@ -46,8 +46,13 @@ export function parseToolCalls(reply: string): ToolCall[] {
     const parsed = JSON.parse(jsonStr) as Record<string, unknown> | Record<string, unknown>[];
     const arr = Array.isArray(parsed) ? parsed : [parsed];
     for (const item of arr) {
-      if (item && typeof item === 'object' && 'name' in item && 'args' in item) {
-        calls.push({ name: String(item.name), args: (item.args as Record<string, unknown>) ?? {} });
+      if (item && typeof item === 'object' && 'name' in item) {
+        const rawArgs = (item as Record<string, unknown>).args;
+        const args =
+          rawArgs !== null && typeof rawArgs === 'object' && !Array.isArray(rawArgs)
+            ? (rawArgs as Record<string, unknown>)
+            : {};
+        calls.push({ name: String((item as Record<string, unknown>).name), args });
       }
     }
   } catch {

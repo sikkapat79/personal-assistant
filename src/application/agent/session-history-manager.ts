@@ -76,6 +76,14 @@ export class SessionHistoryManager {
     return (merged ?? '').trim() || existing;
   }
 
+  /** Clears all in-memory history state and wipes the persisted session store. */
+  reset(): void {
+    this.persistedMessages.splice(0);
+    this.cachedSessionSummary = null;
+    this.lastSummarizedIndex = 0;
+    this.sessionStore.clearSession();
+  }
+
   /**
    * One LLM call (no tools) to produce a structured state snapshot from older conversation turns.
    */

@@ -41,7 +41,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'upsert_log',
     description:
-      'Deprecated for new logs — use apply_log_update with mode create instead. For updating existing logs only. Every field is meaningful—only send the field(s) the user mentioned; all other fields are preserved (e.g. "I did a workout" → set only workout: true; "worked 3 hours" → set only deep_work_hours: 3). Set a short, cool title when creating the first log for that day (e.g. from sleep/mood: "Good sleep · calm start"); when summarizing (end of day or user asks), you MUST call upsert_log with that date and ALL of: title, score, went_well, improve, gratitude, tomorrow, and energy if inferred; do not skip any of these fields. Params: date (YYYY-MM-DD), title, notes, score (1–10), mood (1–5), energy (1–100 = energy budget for that day; use yesterday\'s overview via get_logs as one input when setting today\'s budget), deep_work_hours (number), workout (boolean), diet (boolean), reading_mins (number), went_well, improve, gratitude, tomorrow. Gratitude: capture what the user said; do not reinterpret. Tomorrow: reprioritize from open tasks and recommend what to do next.',
+      'Deprecated. Use apply_log_update for all log writes (create, single_field, summarize). This tool is retained for backward compatibility only and should not be called for new operations.',
     parameters: {
       type: 'object',
       properties: {
@@ -139,11 +139,14 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'delete_todo',
     description:
-      'Delete (remove) a task by id or 1-based index. Before calling: confirm with the user by stating the task title (e.g. "Do you want to delete the task \'Buy milk\'?"). Only call after they confirm. Params: id_or_index (string).',
+      'Delete (remove) a task by id or 1-based index. You MUST ask the user to confirm by stating the exact task title before calling this tool (e.g. "Do you want to delete the task \'Buy milk\'?"). Only call this after the user has explicitly confirmed. Pass confirmed: true to proceed. Params: id_or_index (string), confirmed (boolean, must be true).',
     parameters: {
       type: 'object',
-      properties: { id_or_index: { type: 'string' } },
-      required: ['id_or_index'],
+      properties: {
+        id_or_index: { type: 'string' },
+        confirmed: { type: 'boolean', description: 'Must be true. Only pass this after the user has explicitly confirmed the deletion.' },
+      },
+      required: ['id_or_index', 'confirmed'],
     },
   },
   {
