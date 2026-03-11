@@ -23,7 +23,10 @@ export async function handleUpdateTodo(args: Record<string, unknown>, deps: Tool
   }
   if (args.due_date !== undefined) patch.dueDate = args.due_date === '' ? null : String(args.due_date);
   if (args.notes !== undefined) patch.notes = String(args.notes);
-  if (args.priority !== undefined) patch.priority = parsePriority(args.priority);
+  if (args.priority !== undefined) {
+    const pri = parsePriority(args.priority);
+    if (pri !== undefined) patch.priority = pri;
+  }
   if (args.status !== undefined) {
     const st = parseStatus(args.status);
     if (st !== undefined) patch.status = st;
