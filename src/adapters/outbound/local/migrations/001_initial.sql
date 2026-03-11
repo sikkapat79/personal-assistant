@@ -32,3 +32,18 @@ CREATE TABLE IF NOT EXISTS entity_id_map (
   local_id    TEXT NOT NULL PRIMARY KEY,
   notion_id   TEXT NOT NULL
 );
+
+-- Local-only session summary for cross-session context
+CREATE TABLE IF NOT EXISTS session_summary (
+  id         INTEGER PRIMARY KEY CHECK (id = 1),  -- single-row enforced
+  summary    TEXT NOT NULL,
+  updated_at TEXT NOT NULL  -- ISO 8601
+);
+
+-- Rolling message log for cross-session retention (last N messages kept)
+CREATE TABLE IF NOT EXISTS session_messages (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  role       TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content    TEXT NOT NULL,
+  created_at TEXT NOT NULL     -- ISO 8601
+);

@@ -3,7 +3,7 @@ import { TextAttributes } from '@opentui/core';
 import dayjs from 'dayjs';
 import { designTokens } from '../../../../../design-tokens';
 import { wrapText } from '../utils/wrapText';
-import type { TodoItemDto } from '../../../../../application/dto/todo-dto';
+import type { TodoItemDto } from '@app/todo/todo-dto';
 
 function formatDueDate(dueDate: string): string {
   const d = dayjs(dueDate);

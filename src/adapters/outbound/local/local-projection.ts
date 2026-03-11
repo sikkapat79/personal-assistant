@@ -1,5 +1,5 @@
-import type { DailyLog } from '../../../domain/entities/daily-log';
-import type { Todo } from '../../../domain/entities/todo';
+import type { DailyLog } from '@domain/log/daily-log';
+import type { Todo } from '@domain/todo/todo';
 import type { StoredEvent } from './event-types';
 
 export class LocalProjection {

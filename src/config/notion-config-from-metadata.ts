@@ -1,6 +1,6 @@
 import type { NotionConfig, NotionDbMetadata } from '../adapters/outbound/notion/client';
 import { DEFAULT_LOGS_COLUMNS } from '../adapters/outbound/notion/client';
-import type { AllowedNotionScope } from '../application/dto/metadata';
+import type { AllowedNotionScope } from '../adapters/outbound/notion/client';
 
 /**
  * Build NotionConfig from metadata scope and API key.

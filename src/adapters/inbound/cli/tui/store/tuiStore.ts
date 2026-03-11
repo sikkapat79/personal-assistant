@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { DailyLog } from '../../../../../domain/entities/daily-log';
-import type { TodoItemDto } from '../../../../../application/dto/todo-dto';
+import type { DailyLog } from '@domain/log/daily-log';
+import type { TodoItemDto } from '@app/todo/todo-dto';
 
 interface TuiStoreState {
   terminalSize: { width: number; height: number };

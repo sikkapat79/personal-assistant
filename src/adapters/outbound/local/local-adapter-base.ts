@@ -1,4 +1,4 @@
-import type { IEventQueue } from '../../../application/ports/event-queue';
+import type { IEventQueue } from '@app/shared/event-queue.port';
 import type { EntityType, EventPayload, EventType, StoredEvent } from './event-types';
 import type { LocalProjection } from './local-projection';
 import type { SyncEngine } from './sync-engine';

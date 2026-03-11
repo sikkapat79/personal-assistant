@@ -2,11 +2,11 @@ import { Database } from 'bun:sqlite';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import type { IEventQueue } from '../../../application/ports/event-queue';
-import type { DailyLog } from '../../../domain/entities/daily-log';
-import type { Todo } from '../../../domain/entities/todo';
-import type { StoredEvent } from '../../../application/ports/event-types';
-import { EntityIdMap } from '../../../application/ports/event-types';
+import type { IEventQueue } from '@app/shared/event-queue.port';
+import type { DailyLog } from '@domain/log/daily-log';
+import type { Todo } from '@domain/todo/todo';
+import type { StoredEvent } from '@app/shared/event-types';
+import { EntityIdMap } from '@app/shared/event-types';
 
 interface EventRow {
   id: string;

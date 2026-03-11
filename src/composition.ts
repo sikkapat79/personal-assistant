@@ -1,6 +1,6 @@
-import type { ILogsRepository } from './application/ports/logs-repository';
-import type { ITodosRepository } from './application/ports/todos-repository';
-import type { IMetadataStore } from './application/ports/metadata-store';
+import type { ILogsRepository } from './application/log/logs-repository.port';
+import type { ITodosRepository } from './application/todo/todos-repository.port';
+import type { IMetadataStore } from './application/shared/metadata-store.port';
 import { getNotionClient, buildNotionConfigFromResolved } from './adapters/outbound/notion/client';
 import { NotionLogsAdapter } from './adapters/outbound/notion/logs-adapter';
 import { NotionTodosAdapter } from './adapters/outbound/notion/todos-adapter';
@@ -9,14 +9,15 @@ import { NotionMetadataStore } from './adapters/outbound/notion/notion-metadata-
 import { FilesystemContextAdapter } from './adapters/outbound/context/filesystem-context-adapter';
 import { StubLLMAdapter } from './adapters/outbound/llm/stub-llm-adapter';
 import { OpenAILLMAdapter } from './adapters/outbound/llm/openai-llm-adapter';
-import { LogUseCase } from './application/use-cases/log-use-case';
-import { TodosUseCase } from './application/use-cases/todos-use-case';
-import { AgentUseCase } from './application/use-cases/agent-use-case';
+import { LogUseCase } from './application/log/log-use-case';
+import { TodosUseCase } from './application/todo/todos-use-case';
+import { AgentUseCase } from './application/agent/agent-use-case';
 import { getResolvedConfig } from './config/resolved';
 import { ensureMetadataBootstrapped } from './config/metadata-bootstrap';
 import { buildNotionConfigFromScope } from './config/notion-config-from-metadata';
 import { getOrCreateMetadataDatabaseId } from './config/ensure-metadata-database';
 import { BunSqliteEventQueue } from './adapters/outbound/local/bun-sqlite-event-queue';
+import { SqliteSessionSummaryStore } from './adapters/outbound/local/sqlite-session-summary-store';
 import { LocalProjection } from './adapters/outbound/local/local-projection';
 import { LocalLogsAdapter } from './adapters/outbound/local/local-logs-adapter';
 import { LocalTodosAdapter } from './adapters/outbound/local/local-todos-adapter';
@@ -64,6 +65,7 @@ export async function compose(): Promise<Composition> {
   const dbPath = join(getConfigDir(), 'pax.db');
   const eventQueue = new BunSqliteEventQueue(dbPath);
   eventQueue.migrate();
+  const sessionStore = new SqliteSessionSummaryStore(dbPath);
 
   const projection = new LocalProjection();
   const deviceId = getDeviceId();
@@ -97,6 +99,6 @@ export async function compose(): Promise<Composition> {
     apiKey && apiKey.length > 0
       ? new OpenAILLMAdapter(apiKey, settings.OPENAI_MODEL ?? undefined)
       : new StubLLMAdapter();
-  const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore);
+  const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore, sessionStore);
   return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
 }

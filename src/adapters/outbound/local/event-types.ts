@@ -8,7 +8,7 @@ export type {
   TodoCompletedPayload,
   TodoDeletedPayload,
   DailyLogUpsertedPayload,
-} from '../../../application/ports/event-types';
+} from '@app/shared/event-types';
 
 // Enums and classes must use a value export (not `export type`)
-export { EntityType, EventType, EntityIdMap } from '../../../application/ports/event-types';
+export { EntityType, EventType, EntityIdMap } from '@app/shared/event-types';
