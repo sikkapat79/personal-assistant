@@ -3,12 +3,15 @@ import { TextAttributes } from '@opentui/core';
 import { designTokens } from '../../../../../design-tokens';
 import { truncateText, wrapText } from '../utils/wrapText';
 import { useTuiStore } from '../store/tuiStore';
+import { StatusPickerDropdown } from './StatusPickerDropdown';
 
 
 interface TasksSectionProps {
   contentWidth: number;
   maxVisibleItems?: number;
 }
+
+const STATUS_TO_INDEX: Record<string, number> = { 'Todo': 0, 'In Progress': 1, 'Done': 2 };
 
 export function TasksSection({
   contentWidth,
@@ -19,6 +22,8 @@ export function TasksSection({
   const tasksScrollOffset = useTuiStore((s) => s.tasksScrollOffset);
   const focusedSection = useTuiStore((s) => s.focusedSection);
   const selectedTaskIndex = useTuiStore((s) => s.selectedTaskIndex);
+  const showStatusPicker = useTuiStore((s) => s.showStatusPicker);
+  const statusPickerIndex = useTuiStore((s) => s.statusPickerIndex);
   const focused = focusedSection === 'tasks';
 
   // Convert all tasks to wrapped lines
@@ -55,6 +60,22 @@ export function TasksSection({
   const hasAbove = tasksScrollOffset > 0;
   const visibleLines = allLines.slice(tasksScrollOffset, tasksScrollOffset + maxVisibleItems);
 
+  // Picker anchor: visible line index of the selected task's first line
+  const anchorRow = visibleLines.findIndex(
+    (l) => l.taskIndex === selectedTaskIndex && l.lineIndex === 0
+  );
+
+  const selectedTask = tasks[selectedTaskIndex];
+  const currentStatusIndex = selectedTask ? (STATUS_TO_INDEX[selectedTask.status] ?? 0) : 0;
+
+  // Flip picker above the anchor row when there isn't enough space below
+  const PICKER_HEIGHT = 5; // 3 rows + 2 borders
+  const effectiveAnchorRow = anchorRow >= 0 ? anchorRow : 0;
+  const spaceBelow = maxVisibleItems - effectiveAnchorRow;
+  const pickerTop = spaceBelow >= PICKER_HEIGHT
+    ? 4 + effectiveAnchorRow
+    : Math.max(4, 4 + effectiveAnchorRow - PICKER_HEIGHT);
+
   return (
     <box style={{ flexDirection: 'column', borderStyle: 'single', padding: 1, marginBottom: 1, flexGrow: 1, overflow: 'hidden' }}>
       <text style={{ attributes: TextAttributes.BOLD }}>
@@ -78,6 +99,14 @@ export function TasksSection({
             </text>
           ))}
         </box>
+      )}
+      {showStatusPicker && (
+        <StatusPickerDropdown
+          selectedIndex={statusPickerIndex}
+          currentStatusIndex={currentStatusIndex}
+          top={pickerTop}
+          left={2}
+        />
       )}
     </box>
   );

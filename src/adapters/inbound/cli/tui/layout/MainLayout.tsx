@@ -39,7 +39,7 @@ export function MainLayout() {
       <InputSection inputExpandCap={inputExpandCap} baseLines={inputMaxLines} />
       <box>
         <text fg={designTokens.color.muted}>
-          {truncateText('↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit', topbarContentWidth)}
+          {truncateText('↑↓: scroll | Tab: switch | Space: status | Ctrl+D: done | ?: help | Ctrl+P: settings | Ctrl+C: exit', topbarContentWidth)}
         </text>
       </box>
       {showHelp && <HelpModal />}

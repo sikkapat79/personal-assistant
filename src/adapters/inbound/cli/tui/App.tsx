@@ -11,6 +11,7 @@ import { SETUP_STEPS } from './constants/setup';
 import { SettingsPageContent } from './settings/SettingsPageContent';
 import { FirstRunSetupContent } from './settings/FirstRunSetupContent';
 import { TaskDetailPageContent } from './tasks/TaskDetailPageContent';
+import { DoneTasksPageContent } from './tasks/DoneTasksPageContent';
 import type { Page } from './types';
 import { TerminalTooSmallScreen } from './layout/TerminalTooSmallScreen';
 import { StartupErrorScreen } from './layout/StartupErrorScreen';
@@ -52,7 +53,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
 
   const { submit, getMaxChatScroll } = useChat(agent, renderer, fetchTodayLogRef, terminalSize.width, terminalSize.height);
 
-  const { fetchTodayLog, fetchTasks, getMaxTasksScroll, scrollToTask } = useDataFetching(
+  const { fetchTodayLog, fetchTasks, fetchDoneTasks, getMaxTasksScroll, scrollToTask } = useDataFetching(
     logs,
     todos,
     getMaxChatScroll,
@@ -108,6 +109,7 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
     getMaxTasksScroll,
     getMaxChatScroll,
     fetchTasks,
+    fetchDoneTasks,
     scrollToTask,
     todos,
     renderer,
@@ -171,6 +173,10 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
 
   if (page === 'task-detail') {
     return <TaskDetailPageContent task={selectedTask} terminalWidth={terminalSize.width} />;
+  }
+
+  if (page === 'done-tasks') {
+    return <DoneTasksPageContent terminalWidth={terminalSize.width} />;
   }
 
   return <MainLayout />;

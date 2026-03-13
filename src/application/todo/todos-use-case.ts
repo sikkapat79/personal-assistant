@@ -17,6 +17,11 @@ export class TodosUseCase {
     return list.map(toDto);
   }
 
+  async listDoneToday(todayDate: string): Promise<TodoItemDto[]> {
+    const list = await this.todos.listCompletedToday(todayDate);
+    return list.map(toDto);
+  }
+
   async add(input: TodoAddInputDto): Promise<TodoItemDto> {
     const todo = createTodo(input.title, input.dueDate ?? null, undefined, input.status ?? 'Todo', {
       category: input.category,

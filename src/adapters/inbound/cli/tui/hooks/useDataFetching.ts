@@ -16,6 +16,7 @@ export function useDataFetching(
 ): {
   fetchTodayLog: () => Promise<void>;
   fetchTasks: () => Promise<void>;
+  fetchDoneTasks: () => Promise<void>;
   getMaxTasksScroll: () => number;
   scrollToTask: (taskIndex: number) => void;
 } {
@@ -94,6 +95,20 @@ export function useDataFetching(
     fetchTasks(true); // Show loading on initial fetch
   }, [fetchTasks]);
 
+  const fetchDoneTasks = useCallback(async () => {
+    if (!todos) {
+      useTuiStore.getState().setDoneTasks([]);
+      return;
+    }
+    try {
+      const todayDate = new Date().toISOString().slice(0, 10);
+      const done = await todos.listDoneToday(todayDate);
+      useTuiStore.getState().setDoneTasks(done);
+    } catch (e) {
+      console.error('Failed to fetch done tasks:', e);
+    }
+  }, [todos]);
+
   // Poll tasks every 15 seconds
   useEffect(() => {
     if (!todos) return;
@@ -155,5 +170,5 @@ export function useDataFetching(
     useTuiStore.getState().setChatScrollOffset(getMaxChatScroll());
   }, [history, getMaxChatScroll]);
 
-  return { fetchTodayLog, fetchTasks, getMaxTasksScroll, scrollToTask };
+  return { fetchTodayLog, fetchTasks, fetchDoneTasks, getMaxTasksScroll, scrollToTask };
 }
