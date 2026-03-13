@@ -28,12 +28,16 @@ export function handleSetupKey(key: KeyEvent, ctx: SetupKeyContext): void {
   if (key.name === 'return' || key.name === 'tab' || key.name === 'escape') {
     if ((key.name === 'return' || key.name === 'tab') && ctx.setupInput.trim()) {
       const step = SETUP_STEPS[ctx.setupStep];
-      if (step.type === 'profile') {
-        saveProfile({ displayName: ctx.setupInput.trim() });
-        ctx.setSavedDisplayName(ctx.setupInput.trim());
-      } else {
-        const current = loadSettings();
-        saveSettings({ ...current, [step.key]: ctx.setupInput.trim() });
+      try {
+        if (step.type === 'profile') {
+          saveProfile({ displayName: ctx.setupInput.trim() });
+          ctx.setSavedDisplayName(ctx.setupInput.trim());
+        } else {
+          const current = loadSettings();
+          saveSettings({ ...current, [step.key]: ctx.setupInput.trim() });
+        }
+      } catch (e) {
+        console.error('Failed to save config:', e);
       }
     }
     ctx.setSetupStep(s => s + 1);

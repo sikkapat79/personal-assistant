@@ -14,6 +14,7 @@ export function handleTasksKey(key: KeyEvent, ctx: TasksKeyContext): void {
   const { tasks, selectedTaskIndex } = useTuiStore.getState();
 
   if (key.name === 'up') {
+    if (tasks.length === 0) return;
     const next = Math.max(0, selectedTaskIndex - 1);
     useTuiStore.getState().setSelectedTaskIndex(next);
     ctx.scrollToTask(next);

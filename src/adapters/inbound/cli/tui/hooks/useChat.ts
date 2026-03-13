@@ -26,9 +26,11 @@ export function useChat(
 
   const getMaxChatScroll = useCallback(() => {
     const history = useTuiStore.getState().history;
-    const { chatContentWidth, maxChatLines } = getTuiLayoutMetrics({ width: terminalWidth, height: terminalHeight });
+    const { chatContentWidth, maxChatLines, inputMaxLines } = getTuiLayoutMetrics({ width: terminalWidth, height: terminalHeight });
+    const inputDisplayLines = useTuiStore.getState().inputDisplayLines;
+    const adjustedMaxChatLines = Math.max(5, maxChatLines - (inputDisplayLines - inputMaxLines));
     const totalLines = calculateChatLineCount(history, chatContentWidth);
-    return Math.max(0, totalLines - maxChatLines);
+    return Math.max(0, totalLines - adjustedMaxChatLines);
   }, [terminalWidth, terminalHeight]);
 
   const submit = useCallback(async () => {

@@ -9,19 +9,21 @@ export function insertAt(s: string, pos: number, ch: string): { text: string; po
 
 /** Delete the character before `pos` (backspace). */
 export function deleteBeforePos(s: string, pos: number): { text: string; pos: number } {
-  if (pos <= 0) return { text: s, pos: 0 };
+  const safePos = Math.max(0, Math.min(pos, s.length));
+  if (safePos <= 0) return { text: s, pos: 0 };
   return {
-    text: s.slice(0, pos - 1) + s.slice(pos),
-    pos: pos - 1,
+    text: s.slice(0, safePos - 1) + s.slice(safePos),
+    pos: safePos - 1,
   };
 }
 
 /** Delete the character at `pos` (delete key). */
 export function deleteAtPos(s: string, pos: number): { text: string; pos: number } {
-  if (pos >= s.length) return { text: s, pos };
+  const safePos = Math.max(0, Math.min(pos, s.length));
+  if (safePos >= s.length) return { text: s, pos: safePos };
   return {
-    text: s.slice(0, pos) + s.slice(pos + 1),
-    pos,
+    text: s.slice(0, safePos) + s.slice(safePos + 1),
+    pos: safePos,
   };
 }
 

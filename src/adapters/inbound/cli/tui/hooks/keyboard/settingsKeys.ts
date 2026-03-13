@@ -52,8 +52,12 @@ export function handleSettingsKey(key: KeyEvent, ctx: SettingsKeyContext): void 
 
   if (ctx.settingsTab === 'profile') {
     if (key.name === 'return') {
-      saveProfile({ displayName: ctx.displayNameInput });
-      ctx.setSavedDisplayName(ctx.displayNameInput);
+      try {
+        saveProfile({ displayName: ctx.displayNameInput });
+        ctx.setSavedDisplayName(ctx.displayNameInput);
+      } catch (e) {
+        console.error('Failed to save profile:', e);
+      }
       return;
     }
     if (key.name === 'backspace' || key.name === 'delete') {
@@ -69,8 +73,12 @@ export function handleSettingsKey(key: KeyEvent, ctx: SettingsKeyContext): void 
     if (ctx.apiKeysEditingIndex !== null) {
       if (key.name === 'return') {
         if (ctx.apiKeysEditInput.trim()) {
-          const current = loadSettings();
-          saveSettings({ ...current, [SETTINGS_STEPS[ctx.apiKeysEditingIndex].key]: ctx.apiKeysEditInput.trim() });
+          try {
+            const current = loadSettings();
+            saveSettings({ ...current, [SETTINGS_STEPS[ctx.apiKeysEditingIndex].key]: ctx.apiKeysEditInput.trim() });
+          } catch (e) {
+            console.error('Failed to save settings:', e);
+          }
         }
         ctx.setApiKeysEditingIndex(null);
         ctx.setApiKeysEditInput('');
