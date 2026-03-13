@@ -35,9 +35,12 @@ export function TasksSection({
     const statusIcon = task.status === 'In Progress' ? '▶' : '○';
     const cursorMark = isSelected ? '>' : ' ';
     const prefix = `${taskIndex + 1}.${cursorMark}${statusIcon} `;
+    // ○ and ▶ are Unicode ambiguous-width chars rendered as 2 columns in most terminals.
+    // Add 1 to prefix visual width so wrapText and continuation indent are accurate.
+    const prefixVisualWidth = prefix.length + 1;
     const suffix = task.priority ? ` (${task.priority})` : '';
     const taskText = task.title + suffix;
-    const wrappedLines = wrapText(taskText, contentWidth - prefix.length);
+    const wrappedLines = wrapText(taskText, contentWidth - prefixVisualWidth);
     const color = isSelected ? designTokens.color.accent : task.status === 'In Progress' ? designTokens.color.accent : undefined;
 
     for (let lineIndex = 0; lineIndex < wrappedLines.length; lineIndex++) {
@@ -46,7 +49,7 @@ export function TasksSection({
         text:
           lineIndex === 0
             ? prefix + wrappedLines[lineIndex]
-            : ' '.repeat(prefix.length) + wrappedLines[lineIndex],
+            : ' '.repeat(prefixVisualWidth) + wrappedLines[lineIndex],
         color,
         bold: isSelected,
         lineIndex,
@@ -76,9 +79,12 @@ export function TasksSection({
 
   // Flip picker above the task when there isn't enough space below its last line
   const PICKER_HEIGHT = 5; // 3 rows + 2 borders
+  // Space remaining after the task's last line; used only for flip detection.
   const spaceBelow = maxVisibleItems - taskBottomRow - 1;
+  // Normal: pin picker to the task's first line (dropdown feel).
+  // Flipped: anchor picker just above the task's first line.
   const pickerTop = spaceBelow >= PICKER_HEIGHT
-    ? 4 + taskBottomRow + 1
+    ? 4 + effectiveAnchorRow
     : Math.max(0, 4 + effectiveAnchorRow - PICKER_HEIGHT);
 
   return (
