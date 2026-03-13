@@ -110,6 +110,9 @@ function rebuildTodoFromEvents(events: StoredEvent[]): Todo | undefined {
         notes: todo.notes,
         priority: todo.priority,
       });
+    } else if (event.event_type === EventType.TodoDeleted) {
+      todo = undefined;
+      break;
     }
   }
   return todo;

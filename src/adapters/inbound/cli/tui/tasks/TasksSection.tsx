@@ -4,14 +4,13 @@ import { designTokens } from '../../../../../design-tokens';
 import { truncateText, wrapText } from '../utils/wrapText';
 import { useTuiStore } from '../store/tuiStore';
 import { StatusPickerDropdown } from './StatusPickerDropdown';
+import { STATUS_TO_INDEX } from './taskStatus';
 
 
 interface TasksSectionProps {
   contentWidth: number;
   maxVisibleItems?: number;
 }
-
-const STATUS_TO_INDEX: Record<string, number> = { 'Todo': 0, 'In Progress': 1, 'Done': 2 };
 
 export function TasksSection({
   contentWidth,

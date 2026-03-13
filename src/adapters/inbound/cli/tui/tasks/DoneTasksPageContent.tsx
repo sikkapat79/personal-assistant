@@ -6,6 +6,7 @@ import { useTuiStore } from '../store/tuiStore';
 
 export function DoneTasksPageContent({ terminalWidth }: { terminalWidth: number }) {
   const doneTasks = useTuiStore((s) => s.doneTasks);
+  const loadingDoneTasks = useTuiStore((s) => s.loadingDoneTasks);
   const contentWidth = Math.max(20, terminalWidth - 4);
 
   return (
@@ -16,10 +17,13 @@ export function DoneTasksPageContent({ terminalWidth }: { terminalWidth: number 
       </box>
 
       <box style={{ flexDirection: 'column', marginTop: 1 }}>
-        {doneTasks.length === 0 && (
+        {loadingDoneTasks && (
+          <text fg={designTokens.color.muted}>Loading...</text>
+        )}
+        {!loadingDoneTasks && doneTasks.length === 0 && (
           <text fg={designTokens.color.muted}>No tasks completed today.</text>
         )}
-        {doneTasks.map((task, i) => (
+        {!loadingDoneTasks && doneTasks.map((task, i) => (
           <box key={task.id} style={{ flexDirection: 'row' }}>
             <text fg={designTokens.color.muted}>{`${i + 1}. `}</text>
             <text>{`✓ ${truncateText(task.title, contentWidth - 5)}`}</text>

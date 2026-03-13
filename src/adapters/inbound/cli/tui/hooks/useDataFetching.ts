@@ -102,11 +102,14 @@ export function useDataFetching(
       return;
     }
     try {
+      useTuiStore.getState().setLoadingDoneTasks(true);
       const sinceUtc = dayjs().startOf('day').toISOString();
       const done = await todos.listDoneToday(sinceUtc);
       useTuiStore.getState().setDoneTasks(done);
     } catch (e) {
       console.error('Failed to fetch done tasks:', e);
+    } finally {
+      useTuiStore.getState().setLoadingDoneTasks(false);
     }
   }, [todos]);
 

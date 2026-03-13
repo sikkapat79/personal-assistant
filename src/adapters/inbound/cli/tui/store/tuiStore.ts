@@ -24,6 +24,7 @@ interface TuiStoreState {
   showStatusPicker: boolean;
   statusPickerIndex: number;
   doneTasks: TodoItemDto[];
+  loadingDoneTasks: boolean;
 }
 
 interface TuiStoreActions {
@@ -49,6 +50,7 @@ interface TuiStoreActions {
   setShowStatusPicker: (show: boolean) => void;
   setStatusPickerIndex: (index: number) => void;
   setDoneTasks: (tasks: TodoItemDto[]) => void;
+  setLoadingDoneTasks: (loading: boolean) => void;
 }
 
 type TuiStore = TuiStoreState & TuiStoreActions;
@@ -75,6 +77,7 @@ export const useTuiStore = create<TuiStore>((set) => ({
   showStatusPicker: false,
   statusPickerIndex: 0,
   doneTasks: [],
+  loadingDoneTasks: false,
 
   setTerminalSize: (size) => set({ terminalSize: size }),
   setFocusedSection: (section) => set({ focusedSection: section }),
@@ -106,4 +109,5 @@ export const useTuiStore = create<TuiStore>((set) => ({
   setShowStatusPicker: (show) => set({ showStatusPicker: show }),
   setStatusPickerIndex: (index) => set({ statusPickerIndex: index }),
   setDoneTasks: (tasks) => set({ doneTasks: tasks }),
+  setLoadingDoneTasks: (loading) => set({ loadingDoneTasks: loading }),
 }));

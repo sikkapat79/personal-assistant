@@ -2,6 +2,7 @@ import type { KeyEvent } from '@opentui/core';
 import { useTuiStore } from '../../store/tuiStore';
 import type { TodosUseCase } from '@app/todo/todos-use-case';
 import type { Page } from '../../types';
+import { STATUSES, STATUS_TO_INDEX } from '../../tasks/taskStatus';
 
 export interface TasksKeyContext {
   todos: TodosUseCase | null;
@@ -10,9 +11,6 @@ export interface TasksKeyContext {
   scrollToTask: (index: number) => void;
   setPage: (page: Page) => void;
 }
-
-const STATUSES = ['Todo', 'In Progress', 'Done'] as const;
-const STATUS_TO_INDEX: Record<string, number> = { 'Todo': 0, 'In Progress': 1, 'Done': 2 };
 
 export function handleTasksKey(key: KeyEvent, ctx: TasksKeyContext): void {
   const store = useTuiStore.getState();
@@ -32,7 +30,7 @@ export function handleTasksKey(key: KeyEvent, ctx: TasksKeyContext): void {
     if (key.name === 'down') {
       let next = statusPickerIndex + 1;
       if (next === currentStatusIdx) next++;
-      if (next <= 2) store.setStatusPickerIndex(next);
+      if (next <= STATUSES.length - 1) store.setStatusPickerIndex(next);
       return;
     }
     if (key.name === 'escape') {
