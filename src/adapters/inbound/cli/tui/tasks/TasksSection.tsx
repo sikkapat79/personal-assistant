@@ -74,7 +74,7 @@ export function TasksSection({
   const spaceBelow = maxVisibleItems - effectiveAnchorRow;
   const pickerTop = spaceBelow >= PICKER_HEIGHT
     ? 4 + effectiveAnchorRow
-    : Math.max(4, 4 + effectiveAnchorRow - PICKER_HEIGHT);
+    : Math.max(0, 4 + effectiveAnchorRow - PICKER_HEIGHT);
 
   return (
     <box style={{ flexDirection: 'column', borderStyle: 'single', padding: 1, marginBottom: 1, flexGrow: 1, overflow: 'hidden' }}>
