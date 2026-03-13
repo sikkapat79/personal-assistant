@@ -9,8 +9,11 @@ export function HelpModal() {
       <text fg={designTokens.color.muted}>    (Chat ↔ Tasks)</text>
       <text>↑ ↓ - Scroll focused section</text>
       <text>Enter - Send message (when chat focused)</text>
+      <text>Space - Change task status (when tasks focused)</text>
+      <text>Ctrl+D - View done tasks today</text>
       <text>/clear - Clear chat history</text>
       <text>? - Show this help</text>
+      <text>Ctrl+P - Settings</text>
       <text>Ctrl+C - Exit</text>
       <text> </text>
       <text fg={designTokens.color.muted}>Press any key to close...</text>

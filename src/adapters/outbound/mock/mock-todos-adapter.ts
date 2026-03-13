@@ -61,6 +61,10 @@ export class MockTodosAdapter implements ITodosRepository {
     return [...this.todos];
   }
 
+  async listCompletedToday(_sinceUtc: string): Promise<Todo[]> {
+    return [];
+  }
+
   async listOpen(): Promise<Todo[]> {
     return this.todos.filter(t => t.status !== 'Done');
   }

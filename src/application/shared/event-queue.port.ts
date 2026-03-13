@@ -14,4 +14,8 @@ export interface IEventQueue {
   upsertSnapshotLog(log: DailyLog): void;
   getEntityIdMap(): EntityIdMap;
   persistEntityIdMapping(localId: string, notionId: string): void;
+  /** Returns entity_ids of todos completed since the given UTC timestamp (start of local today). */
+  listCompletedTodayIds(sinceUtc: string): string[];
+  /** Returns all events for a given entity_id, ordered by id ASC. */
+  getEventsForEntity(entityId: string): StoredEvent[];
 }

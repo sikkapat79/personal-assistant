@@ -176,6 +176,24 @@ export class BunSqliteEventQueue implements IEventQueue {
     return map;
   }
 
+  listCompletedTodayIds(sinceUtc: string): string[] {
+    // sinceUtc is start of local today in UTC (e.g. '2026-03-13T07:00:00.000Z' for UTC+7)
+    // No upper bound needed — tasks cannot be marked done in the future
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT entity_id FROM events WHERE event_type = 'todo.completed' AND timestamp >= ?`
+      )
+      .all(sinceUtc) as { entity_id: string }[];
+    return rows.map((r) => r.entity_id);
+  }
+
+  getEventsForEntity(entityId: string): StoredEvent[] {
+    const rows = this.db
+      .prepare(`SELECT id, entity_type, entity_id, event_type, payload, timestamp, device_id, synced FROM events WHERE entity_id = ? ORDER BY id ASC`)
+      .all(entityId) as EventRow[];
+    return rows.map(rowToStoredEvent);
+  }
+
   /** Persists a local → Notion id mapping to the database. */
   persistEntityIdMapping(localId: string, notionId: string): void {
     this.db

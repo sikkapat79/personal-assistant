@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_unsynced
   ON events (synced, timestamp ASC) WHERE synced = 0;
 
+CREATE INDEX IF NOT EXISTS idx_events_type_timestamp ON events (event_type, timestamp);
+
 -- Notion snapshot cache: todos
 CREATE TABLE IF NOT EXISTS snapshot_todos (
   notion_id   TEXT NOT NULL PRIMARY KEY,

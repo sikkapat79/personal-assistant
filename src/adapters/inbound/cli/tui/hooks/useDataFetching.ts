@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import dayjs from 'dayjs';
 import { todayLogDate, createLogDate } from '../../../../../domain/log/log-date';
 import type { ILogsRepository } from '../../../../../application/log/logs-repository.port';
 import { wrapText } from '../utils/wrapText';
@@ -16,6 +17,7 @@ export function useDataFetching(
 ): {
   fetchTodayLog: () => Promise<void>;
   fetchTasks: () => Promise<void>;
+  fetchDoneTasks: () => Promise<void>;
   getMaxTasksScroll: () => number;
   scrollToTask: (taskIndex: number) => void;
 } {
@@ -94,6 +96,23 @@ export function useDataFetching(
     fetchTasks(true); // Show loading on initial fetch
   }, [fetchTasks]);
 
+  const fetchDoneTasks = useCallback(async () => {
+    if (!todos) {
+      useTuiStore.getState().setDoneTasks([]);
+      return;
+    }
+    try {
+      useTuiStore.getState().setLoadingDoneTasks(true);
+      const sinceUtc = dayjs().startOf('day').toISOString();
+      const done = await todos.listDoneToday(sinceUtc);
+      useTuiStore.getState().setDoneTasks(done);
+    } catch (e) {
+      console.error('Failed to fetch done tasks:', e);
+    } finally {
+      useTuiStore.getState().setLoadingDoneTasks(false);
+    }
+  }, [todos]);
+
   // Poll tasks every 15 seconds
   useEffect(() => {
     if (!todos) return;
@@ -155,5 +174,5 @@ export function useDataFetching(
     useTuiStore.getState().setChatScrollOffset(getMaxChatScroll());
   }, [history, getMaxChatScroll]);
 
-  return { fetchTodayLog, fetchTasks, getMaxTasksScroll, scrollToTask };
+  return { fetchTodayLog, fetchTasks, fetchDoneTasks, getMaxTasksScroll, scrollToTask };
 }

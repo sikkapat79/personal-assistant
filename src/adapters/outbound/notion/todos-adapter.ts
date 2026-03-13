@@ -75,6 +75,12 @@ export class NotionTodosAdapter implements ITodosRepository {
     return res.results.map((p) => pageToTodo(p, c, this.getDoneKind())).filter(Boolean) as Todo[];
   }
 
+  // TODO: Notion adapter cannot reconstruct completed-today tasks without event sourcing.
+  // Future: query Notion API for tasks last edited today with Done status.
+  async listCompletedToday(_sinceUtc: string): Promise<Todo[]> {
+    return [];
+  }
+
   async add(todo: Todo): Promise<Todo> {
     const c = this.columns;
     const kind = this.getDoneKind();

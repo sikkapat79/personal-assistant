@@ -37,6 +37,7 @@ interface AppKeyboardParams {
   getMaxTasksScroll: () => number;
   getMaxChatScroll: () => number;
   fetchTasks: () => Promise<void>;
+  fetchDoneTasks: () => Promise<void>;
   scrollToTask: (taskIndex: number) => void;
   todos: TodosUseCase | null;
   renderer: ReturnType<typeof useRenderer>;
@@ -86,6 +87,9 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
   const fetchTasksRef = useRef(params.fetchTasks);
   useEffect(() => { fetchTasksRef.current = params.fetchTasks; }, [params.fetchTasks]);
 
+  const fetchDoneTasksRef = useRef(params.fetchDoneTasks);
+  useEffect(() => { fetchDoneTasksRef.current = params.fetchDoneTasks; }, [params.fetchDoneTasks]);
+
   const scrollToTaskRef = useRef(params.scrollToTask);
   useEffect(() => { scrollToTaskRef.current = params.scrollToTask; }, [params.scrollToTask]);
 
@@ -104,6 +108,12 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
     // Task detail — Escape goes back to main
     if (pageRef.current === 'task-detail') {
       if (key.name === 'escape') params.setPage('main');
+      return;
+    }
+
+    // Done tasks page — Escape or Ctrl+D closes
+    if (pageRef.current === 'done-tasks') {
+      if (key.name === 'escape' || (key.ctrl && key.name === 'd')) params.setPage('main');
       return;
     }
 
@@ -151,6 +161,13 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
       return;
     }
 
+    // Open done tasks page
+    if (key.ctrl && key.name === 'd') {
+      void fetchDoneTasksRef.current().catch(console.error);
+      params.setPage('done-tasks');
+      return;
+    }
+
     // Open settings
     if (key.ctrl && key.name === 'p') {
       params.setDisplayNameInput(resolvedRef.current.profile.displayName);
@@ -175,6 +192,7 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
       handleTasksKey(key, {
         todos: todosRef.current,
         fetchTasks: fetchTasksRef.current,
+        fetchDoneTasks: fetchDoneTasksRef.current,
         scrollToTask: scrollToTaskRef.current,
         setPage: params.setPage,
       });

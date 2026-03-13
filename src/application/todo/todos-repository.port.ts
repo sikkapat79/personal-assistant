@@ -7,6 +7,7 @@ export type { TodoUpdatePatch } from './todo-update-patch';
 export interface ITodosRepository {
   listOpen(): Promise<Todo[]>;
   listAll(): Promise<Todo[]>;
+  listCompletedToday(sinceUtc: string): Promise<Todo[]>;
   add(todo: Todo): Promise<Todo>;
   complete(id: TodoId): Promise<void>;
   update(id: TodoId, patch: TodoUpdatePatch): Promise<void>;

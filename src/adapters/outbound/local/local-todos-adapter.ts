@@ -37,6 +37,19 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
     return Array.from(this.projection.todos.values()).map((todo) => ({ ...todo }));
   }
 
+  async listCompletedToday(sinceUtc: string): Promise<Todo[]> {
+    const ids = this.queue.listCompletedTodayIds(sinceUtc);
+    return ids
+      .map((id) => {
+        // Prefer live projection (task still in-memory after completion)
+        const fromProjection = this.projection.todos.get(id);
+        if (fromProjection) return fromProjection;
+        // Fallback: rebuild from events (covers post-hydration or post-sync cases)
+        return rebuildTodoFromEvents(this.queue.getEventsForEntity(id));
+      })
+      .filter((t): t is Todo => t !== undefined);
+  }
+
   async add(todo: Todo): Promise<Todo> {
     const localId = Bun.randomUUIDv7();
     const payload: TodoCreatedPayload = {
@@ -66,6 +79,43 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
   async delete(id: TodoId): Promise<void> {
     this.write(id, EventType.TodoDeleted, {});
   }
+}
+
+function rebuildTodoFromEvents(events: StoredEvent[]): Todo | undefined {
+  let todo: Todo | undefined;
+  for (const event of events) {
+    if (event.event_type === EventType.TodoCreated) {
+      const p = event.payload as TodoCreatedPayload;
+      todo = createTodo(p.title, p.dueDate ?? null, event.entity_id, p.status, {
+        category: p.category,
+        notes: p.notes,
+        priority: p.priority,
+      });
+    } else if (event.event_type === EventType.TodoUpdated && todo) {
+      const { patch } = event.payload as TodoUpdatedPayload;
+      todo = createTodo(
+        patch.title ?? todo.title,
+        patch.dueDate !== undefined ? patch.dueDate : todo.dueDate,
+        todo.id,
+        patch.status ?? todo.status,
+        {
+          category: patch.category ?? todo.category,
+          notes: patch.notes ?? todo.notes,
+          priority: patch.priority ?? todo.priority,
+        }
+      );
+    } else if (event.event_type === EventType.TodoCompleted && todo) {
+      todo = createTodo(todo.title, todo.dueDate, todo.id, 'Done', {
+        category: todo.category,
+        notes: todo.notes,
+        priority: todo.priority,
+      });
+    } else if (event.event_type === EventType.TodoDeleted) {
+      todo = undefined;
+      break;
+    }
+  }
+  return todo;
 }
 
 function applyTodoCreated(projection: LocalProjection, event: StoredEvent): void {
