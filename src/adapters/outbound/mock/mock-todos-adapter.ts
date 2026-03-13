@@ -61,7 +61,7 @@ export class MockTodosAdapter implements ITodosRepository {
     return [...this.todos];
   }
 
-  async listCompletedToday(_todayDate: string): Promise<Todo[]> {
+  async listCompletedToday(_sinceUtc: string): Promise<Todo[]> {
     return [];
   }
 

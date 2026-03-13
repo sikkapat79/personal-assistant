@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import dayjs from 'dayjs';
 import { todayLogDate, createLogDate } from '../../../../../domain/log/log-date';
 import type { ILogsRepository } from '../../../../../application/log/logs-repository.port';
 import { wrapText } from '../utils/wrapText';
@@ -101,8 +102,8 @@ export function useDataFetching(
       return;
     }
     try {
-      const todayDate = new Date().toISOString().slice(0, 10);
-      const done = await todos.listDoneToday(todayDate);
+      const sinceUtc = dayjs().startOf('day').toISOString();
+      const done = await todos.listDoneToday(sinceUtc);
       useTuiStore.getState().setDoneTasks(done);
     } catch (e) {
       console.error('Failed to fetch done tasks:', e);

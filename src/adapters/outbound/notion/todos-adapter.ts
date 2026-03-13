@@ -75,7 +75,7 @@ export class NotionTodosAdapter implements ITodosRepository {
     return res.results.map((p) => pageToTodo(p, c, this.getDoneKind())).filter(Boolean) as Todo[];
   }
 
-  async listCompletedToday(_todayDate: string): Promise<Todo[]> {
+  async listCompletedToday(_sinceUtc: string): Promise<Todo[]> {
     return [];
   }
 

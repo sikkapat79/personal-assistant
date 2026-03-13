@@ -37,8 +37,8 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
     return Array.from(this.projection.todos.values()).map((todo) => ({ ...todo }));
   }
 
-  async listCompletedToday(todayDate: string): Promise<Todo[]> {
-    const ids = this.queue.listCompletedTodayIds(todayDate);
+  async listCompletedToday(sinceUtc: string): Promise<Todo[]> {
+    const ids = this.queue.listCompletedTodayIds(sinceUtc);
     return ids
       .map((id) => {
         // Prefer live projection (task still in-memory after completion)

@@ -17,8 +17,8 @@ export class TodosUseCase {
     return list.map(toDto);
   }
 
-  async listDoneToday(todayDate: string): Promise<TodoItemDto[]> {
-    const list = await this.todos.listCompletedToday(todayDate);
+  async listDoneToday(sinceUtc: string): Promise<TodoItemDto[]> {
+    const list = await this.todos.listCompletedToday(sinceUtc);
     return list.map(toDto);
   }
 

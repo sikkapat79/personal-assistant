@@ -176,10 +176,14 @@ export class BunSqliteEventQueue implements IEventQueue {
     return map;
   }
 
-  listCompletedTodayIds(todayDate: string): string[] {
+  listCompletedTodayIds(sinceUtc: string): string[] {
+    // sinceUtc is start of local today in UTC (e.g. '2026-03-13T07:00:00.000Z' for UTC+7)
+    // No upper bound needed — tasks cannot be marked done in the future
     const rows = this.db
-      .prepare(`SELECT DISTINCT entity_id FROM events WHERE event_type = 'todo.completed' AND timestamp LIKE ?`)
-      .all(`${todayDate}%`) as { entity_id: string }[];
+      .prepare(
+        `SELECT DISTINCT entity_id FROM events WHERE event_type = 'todo.completed' AND timestamp >= ?`
+      )
+      .all(sinceUtc) as { entity_id: string }[];
     return rows.map((r) => r.entity_id);
   }
 
