@@ -12,6 +12,7 @@ import { HelpModal } from './HelpModal';
 export function MainLayout() {
   const terminalSize = useTuiStore((s) => s.terminalSize);
   const showHelp = useTuiStore((s) => s.showHelp);
+  const inputDisplayLines = useTuiStore((s) => s.inputDisplayLines);
   const {
     chatColumnWidth,
     rightColumnWidth,
@@ -21,19 +22,21 @@ export function MainLayout() {
     maxTasksVisible,
     maxChatLines,
   } = getTuiLayoutMetrics(terminalSize);
+  const inputExpandCap = inputMaxLines + 3;
+  const adjustedMaxChatLines = Math.max(5, maxChatLines - (inputDisplayLines - inputMaxLines));
 
   return (
     <box style={{ flexDirection: 'column', padding: 1, overflow: 'hidden', height: '100%' }}>
       <TopbarSection contentWidth={topbarContentWidth} />
       <box style={{ flexDirection: 'row', overflow: 'hidden', flexGrow: 1 }}>
         <box style={{ flexDirection: 'column', width: chatColumnWidth, overflow: 'hidden' }}>
-          <ChatSection contentWidth={chatContentWidth} maxVisibleMessages={maxChatLines} />
+          <ChatSection contentWidth={chatContentWidth} maxVisibleMessages={adjustedMaxChatLines} />
         </box>
         <box style={{ flexDirection: 'column', width: rightColumnWidth, overflow: 'hidden' }}>
           <TasksSection contentWidth={rightColumnWidth - 6} maxVisibleItems={maxTasksVisible} />
         </box>
       </box>
-      <InputSection maxLines={inputMaxLines} />
+      <InputSection inputExpandCap={inputExpandCap} baseLines={inputMaxLines} />
       <box>
         <text fg={designTokens.color.muted}>
           {truncateText('↑↓: scroll | Tab: switch | ?: help | Ctrl+P: settings | Ctrl+C: exit', topbarContentWidth)}

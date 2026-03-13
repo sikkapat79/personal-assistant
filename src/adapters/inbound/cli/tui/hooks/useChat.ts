@@ -32,9 +32,10 @@ export function useChat(
   }, [terminalWidth, terminalHeight]);
 
   const submit = useCallback(async () => {
-    const { input, history, setInput, setThinking, appendHistory, setHistory } = useTuiStore.getState();
+    const { input, history, setInput, setCursorPos, setThinking, appendHistory, setHistory } = useTuiStore.getState();
     const line = input.trim();
     setInput('');
+    setCursorPos(0);
     if (!line) return;
 
     if (line === 'exit' || line === 'quit') {

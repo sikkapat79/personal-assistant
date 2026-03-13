@@ -75,7 +75,10 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
       } else if (!hasRequiredConfig() || (setupStep > 0 && setupStep <= SETUP_STEPS.length)) {
         setSetupInput(s => s + text);
       } else {
-        useTuiStore.getState().setInput(s => s + text);
+        const { input, cursorPos, setInput, setCursorPos } = useTuiStore.getState();
+        const clamped = Math.max(0, Math.min(cursorPos, input.length));
+        setInput(input.slice(0, clamped) + text + input.slice(clamped));
+        setCursorPos(clamped + text.length);
       }
     };
     keyHandler.on('paste', handler);
