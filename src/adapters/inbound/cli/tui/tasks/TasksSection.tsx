@@ -60,20 +60,25 @@ export function TasksSection({
   const hasAbove = tasksScrollOffset > 0;
   const visibleLines = allLines.slice(tasksScrollOffset, tasksScrollOffset + maxVisibleItems);
 
-  // Picker anchor: visible line index of the selected task's first line
+  // Picker anchor: visible line indices of the selected task (first and last)
   const anchorRow = visibleLines.findIndex(
     (l) => l.taskIndex === selectedTaskIndex && l.lineIndex === 0
+  );
+  const effectiveAnchorRow = anchorRow >= 0 ? anchorRow : 0;
+  // Last visible line of the selected task (task may wrap to multiple lines)
+  const taskBottomRow = visibleLines.reduce(
+    (last, l, i) => (l.taskIndex === selectedTaskIndex ? i : last),
+    effectiveAnchorRow
   );
 
   const selectedTask = tasks[selectedTaskIndex];
   const currentStatusIndex = selectedTask ? (STATUS_TO_INDEX[selectedTask.status] ?? 0) : 0;
 
-  // Flip picker above the anchor row when there isn't enough space below
+  // Flip picker above the task when there isn't enough space below its last line
   const PICKER_HEIGHT = 5; // 3 rows + 2 borders
-  const effectiveAnchorRow = anchorRow >= 0 ? anchorRow : 0;
-  const spaceBelow = maxVisibleItems - effectiveAnchorRow;
+  const spaceBelow = maxVisibleItems - taskBottomRow - 1;
   const pickerTop = spaceBelow >= PICKER_HEIGHT
-    ? 4 + effectiveAnchorRow
+    ? 4 + taskBottomRow + 1
     : Math.max(0, 4 + effectiveAnchorRow - PICKER_HEIGHT);
 
   return (
