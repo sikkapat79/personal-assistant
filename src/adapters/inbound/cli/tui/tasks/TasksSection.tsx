@@ -96,7 +96,8 @@ export function TasksSection({
         <text fg={designTokens.color.muted}>{truncateText('No active tasks', contentWidth)}</text>
       )}
       {!loadingTasks && tasks.length > 0 && (
-        <box style={{ flexDirection: 'column', marginTop: 1 }}>
+        <box style={{ flexDirection: 'column' }}>
+          <text> </text>
           {visibleLines.map((line) => (
             <text
               key={`${line.taskId}-${line.lineIndex}`}
