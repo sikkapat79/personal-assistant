@@ -7,10 +7,13 @@ interface TuiStoreState {
   focusedSection: 'tasks' | 'chat';
   showHelp: boolean;
   input: string;
+  cursorPos: number;
   history: { role: 'user' | 'assistant'; content: string }[];
   thinking: boolean;
   spinThinking: string;
   chatScrollOffset: number;
+  inputScrollOffset: number;
+  inputDisplayLines: number;
   tasks: TodoItemDto[];
   loadingTasks: boolean;
   tasksScrollOffset: number;
@@ -25,11 +28,14 @@ interface TuiStoreActions {
   setFocusedSection: (section: 'tasks' | 'chat') => void;
   setShowHelp: (show: boolean) => void;
   setInput: (updater: string | ((prev: string) => string)) => void;
+  setCursorPos: (pos: number) => void;
   setHistory: (history: { role: 'user' | 'assistant'; content: string }[]) => void;
   appendHistory: (messages: { role: 'user' | 'assistant'; content: string }[]) => void;
   setThinking: (thinking: boolean) => void;
   setSpinThinking: (frame: string) => void;
   setChatScrollOffset: (updater: number | ((prev: number) => number)) => void;
+  setInputScrollOffset: (updater: number | ((prev: number) => number)) => void;
+  setInputDisplayLines: (lines: number) => void;
   setTasks: (tasks: TodoItemDto[]) => void;
   setLoadingTasks: (loading: boolean) => void;
   setTasksScrollOffset: (updater: number | ((prev: number) => number)) => void;
@@ -46,10 +52,13 @@ export const useTuiStore = create<TuiStore>((set) => ({
   focusedSection: 'chat',
   showHelp: false,
   input: '',
+  cursorPos: 0,
   history: [],
   thinking: false,
   spinThinking: '',
   chatScrollOffset: 0,
+  inputScrollOffset: 0,
+  inputDisplayLines: 2,
   tasks: [],
   loadingTasks: true,
   tasksScrollOffset: 0,
@@ -64,6 +73,7 @@ export const useTuiStore = create<TuiStore>((set) => ({
   setInput: (updater) => set((s) => ({
     input: typeof updater === 'function' ? updater(s.input) : updater,
   })),
+  setCursorPos: (pos) => set({ cursorPos: pos }),
   setHistory: (history) => set({ history }),
   appendHistory: (messages) => set((s) => ({ history: [...s.history, ...messages] })),
   setThinking: (thinking) => set({ thinking }),
@@ -71,6 +81,10 @@ export const useTuiStore = create<TuiStore>((set) => ({
   setChatScrollOffset: (updater) => set((s) => ({
     chatScrollOffset: typeof updater === 'function' ? updater(s.chatScrollOffset) : updater,
   })),
+  setInputScrollOffset: (updater) => set((s) => ({
+    inputScrollOffset: typeof updater === 'function' ? updater(s.inputScrollOffset) : updater,
+  })),
+  setInputDisplayLines: (lines) => set({ inputDisplayLines: lines }),
   setTasks: (tasks) => set({ tasks }),
   setLoadingTasks: (loading) => set({ loadingTasks: loading }),
   setTasksScrollOffset: (updater) => set((s) => ({

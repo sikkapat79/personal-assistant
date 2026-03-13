@@ -1,15 +1,43 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTuiStore } from '../store/tuiStore';
+import { getCursorLineCol } from '../utils/textInput';
+import { designTokens } from '../../../../../design-tokens';
 
 interface InputSectionProps {
-  maxLines?: number;
+  inputExpandCap: number;
+  baseLines: number;
 }
 
-export function InputSection({ maxLines = 3 }: InputSectionProps) {
+export function InputSection({ inputExpandCap, baseLines }: InputSectionProps) {
   const input = useTuiStore((s) => s.input);
+  const cursorPos = useTuiStore((s) => s.cursorPos);
+  const inputScrollOffset = useTuiStore((s) => s.inputScrollOffset);
+  const setInputScrollOffset = useTuiStore((s) => s.setInputScrollOffset);
+  const setInputDisplayLines = useTuiStore((s) => s.setInputDisplayLines);
 
-  // Show full input without truncation (wraps if needed)
-  const displayText = input.length > 0 ? `> ${input}▌` : '> ▌';
+  const lines = input.split('\n');
+  const { line: cursorLine, col: cursorCol } = getCursorLineCol(input, cursorPos);
+
+  const displayedLines = Math.max(baseLines, Math.min(lines.length, inputExpandCap));
+  const boxHeight = displayedLines + 2; // +2 for borders
+
+  // Sync display line count to store so MainLayout can adjust chat height
+  useEffect(() => {
+    setInputDisplayLines(displayedLines);
+  }, [displayedLines, setInputDisplayLines]);
+
+  // Keep cursor line visible
+  useEffect(() => {
+    setInputScrollOffset((offset) => {
+      if (cursorLine < offset) return cursorLine;
+      if (cursorLine >= offset + displayedLines) return cursorLine - displayedLines + 1;
+      return offset;
+    });
+  }, [cursorLine, displayedLines, setInputScrollOffset]);
+
+  const hasAbove = inputScrollOffset > 0;
+  const hasBelow = inputScrollOffset + displayedLines < lines.length;
+  const visibleLines = lines.slice(inputScrollOffset, inputScrollOffset + displayedLines);
 
   return (
     <box style={{
@@ -17,10 +45,32 @@ export function InputSection({ maxLines = 3 }: InputSectionProps) {
       borderStyle: 'single',
       paddingLeft: 1,
       paddingRight: 1,
-      height: maxLines + 2, // +2 for borders (top + bottom)
-      overflow: 'hidden'
+      height: boxHeight,
+      overflow: 'hidden',
     }}>
-      <text>{displayText}</text>
+      {visibleLines.map((line, i) => {
+        const absIdx = i + inputScrollOffset;
+        let prefix: string;
+        if (absIdx === 0) {
+          prefix = hasAbove ? '↑ ' : '> ';
+        } else if (i === displayedLines - 1 && hasBelow) {
+          prefix = '↓ ';
+        } else {
+          prefix = '  ';
+        }
+
+        if (absIdx === cursorLine) {
+          const before = line.slice(0, cursorCol);
+          const atCursor = line[cursorCol] ?? ' ';
+          const after = line.slice(cursorCol + 1);
+          return (
+            <text key={absIdx}>
+              {prefix}{before}<span style={{ bg: designTokens.color.accent, fg: '#000000' }}>{atCursor}</span>{after}
+            </text>
+          );
+        }
+        return <text key={absIdx}>{prefix}{line}</text>;
+      })}
     </box>
   );
 }
