@@ -12,6 +12,7 @@ export interface TasksKeyContext {
 }
 
 const STATUSES = ['Todo', 'In Progress', 'Done'] as const;
+const STATUS_TO_INDEX: Record<string, number> = { 'Todo': 0, 'In Progress': 1, 'Done': 2 };
 
 export function handleTasksKey(key: KeyEvent, ctx: TasksKeyContext): void {
   const store = useTuiStore.getState();
@@ -19,12 +20,19 @@ export function handleTasksKey(key: KeyEvent, ctx: TasksKeyContext): void {
 
   // --- Status picker intercept (highest priority) ---
   if (showStatusPicker) {
+    const currentStatusIdx = STATUS_TO_INDEX[tasks[selectedTaskIndex]?.status ?? 'Todo'] ?? 0;
+
     if (key.name === 'up') {
-      store.setStatusPickerIndex(Math.max(0, statusPickerIndex - 1));
+      // Skip the disabled (current) status when navigating
+      let next = statusPickerIndex - 1;
+      if (next === currentStatusIdx) next--;
+      if (next >= 0) store.setStatusPickerIndex(next);
       return;
     }
     if (key.name === 'down') {
-      store.setStatusPickerIndex(Math.min(2, statusPickerIndex + 1));
+      let next = statusPickerIndex + 1;
+      if (next === currentStatusIdx) next++;
+      if (next <= 2) store.setStatusPickerIndex(next);
       return;
     }
     if (key.name === 'escape') {
@@ -74,8 +82,9 @@ export function handleTasksKey(key: KeyEvent, ctx: TasksKeyContext): void {
   if (key.name === 'space') {
     const task = tasks[selectedTaskIndex];
     if (task) {
-      const statusToIndex: Record<string, number> = { 'Todo': 0, 'In Progress': 1, 'Done': 2 };
-      store.setStatusPickerIndex(statusToIndex[task.status] ?? 0);
+      const currentIdx = STATUS_TO_INDEX[task.status] ?? 0;
+      // Default cursor to next stage (skip the disabled current status)
+      store.setStatusPickerIndex((currentIdx + 1) % 3);
       store.setShowStatusPicker(true);
     }
     return;
