@@ -50,9 +50,10 @@ export function handleChatKey(key: KeyEvent, ctx: ChatKeyContext): void {
 
   const { input, cursorPos } = store;
 
-  // Newline: Ctrl+J (linefeed), Option+Enter (meta+return), or Shift+Enter (Kitty terminals)
+  // Newline: Ctrl+J (linefeed or ctrl+j depending on terminal), Option+Enter (meta+return), or Shift+Enter (Kitty terminals)
   if (
     key.name === 'linefeed' ||
+    (key.ctrl && key.name === 'j') ||
     (key.name === 'return' && key.meta) ||
     (key.name === 'return' && key.shift)
   ) {
