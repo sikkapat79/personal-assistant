@@ -50,6 +50,8 @@ function mergedSettings(): Settings {
       process.env.NOTION_TODOS_IN_PROGRESS_VALUE ?? file.NOTION_TODOS_IN_PROGRESS_VALUE,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? file.OPENAI_API_KEY,
     OPENAI_MODEL: process.env.OPENAI_MODEL ?? file.OPENAI_MODEL,
+    TURSO_URL: process.env.TURSO_URL ?? file.TURSO_URL,
+    TURSO_TOKEN: process.env.TURSO_TOKEN ?? file.TURSO_TOKEN,
   };
 }
 

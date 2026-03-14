@@ -38,16 +38,18 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
   }
 
   async listCompletedToday(sinceUtc: string): Promise<Todo[]> {
-    const ids = this.queue.listCompletedTodayIds(sinceUtc);
-    return ids
-      .map((id) => {
+    const ids = await this.queue.listCompletedTodayIds(sinceUtc);
+    const todos = await Promise.all(
+      ids.map(async (id) => {
         // Prefer live projection (task still in-memory after completion)
         const fromProjection = this.projection.todos.get(id);
         if (fromProjection) return fromProjection;
         // Fallback: rebuild from events (covers post-hydration or post-sync cases)
-        return rebuildTodoFromEvents(this.queue.getEventsForEntity(id));
+        const entityEvents = await this.queue.getEventsForEntity(id);
+        return rebuildTodoFromEvents(entityEvents);
       })
-      .filter((t): t is Todo => t !== undefined);
+    );
+    return todos.filter((t): t is Todo => t !== undefined);
   }
 
   async add(todo: Todo): Promise<Todo> {
@@ -60,7 +62,7 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
       notes: todo.notes,
       priority: todo.priority,
     };
-    this.write(localId, EventType.TodoCreated, payload);
+    await this.write(localId, EventType.TodoCreated, payload);
     // Return the todo with the local UUID as its id
     const stored = this.projection.todos.get(localId);
     if (!stored) throw new Error(`[LocalTodosAdapter] projection missing todo after write — handler not registered`);
@@ -68,16 +70,16 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
   }
 
   async complete(id: TodoId): Promise<void> {
-    this.write(id, EventType.TodoCompleted, {});
+    await this.write(id, EventType.TodoCompleted, {});
   }
 
   async update(id: TodoId, patch: TodoUpdatePatch): Promise<void> {
     const payload: TodoUpdatedPayload = { patch };
-    this.write(id, EventType.TodoUpdated, payload);
+    await this.write(id, EventType.TodoUpdated, payload);
   }
 
   async delete(id: TodoId): Promise<void> {
-    this.write(id, EventType.TodoDeleted, {});
+    await this.write(id, EventType.TodoDeleted, {});
   }
 }
 

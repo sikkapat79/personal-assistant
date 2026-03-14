@@ -16,8 +16,9 @@ import { getResolvedConfig } from './config/resolved';
 import { ensureMetadataBootstrapped } from './config/metadata-bootstrap';
 import { buildNotionConfigFromScope } from './config/notion-config-from-metadata';
 import { getOrCreateMetadataDatabaseId } from './config/ensure-metadata-database';
-import { BunSqliteEventQueue } from './adapters/outbound/local/bun-sqlite-event-queue';
 import { SqliteSessionSummaryStore } from './adapters/outbound/local/sqlite-session-summary-store';
+import { TursoEventQueue } from './adapters/outbound/turso/turso-event-queue';
+import { createTursoDb } from './adapters/outbound/turso/client';
 import { LocalProjection } from './adapters/outbound/local/local-projection';
 import { LocalLogsAdapter } from './adapters/outbound/local/local-logs-adapter';
 import { LocalTodosAdapter } from './adapters/outbound/local/local-todos-adapter';
@@ -61,11 +62,18 @@ export async function compose(): Promise<Composition> {
     config.db.todos.doneKind
   );
 
-  // Local-first layer: SQLite event queue + projection
-  const dbPath = join(getConfigDir(), 'pax.db');
-  const eventQueue = new BunSqliteEventQueue(dbPath);
-  eventQueue.migrate();
-  const sessionStore = new SqliteSessionSummaryStore(dbPath);
+  // Local-first layer: Turso (libSQL) event queue + in-memory projection
+  const configDir = getConfigDir();
+  const dbPath = join(configDir, 'pax.db');
+  const tursoUrl = settings.TURSO_URL ?? '';
+  const tursoToken = settings.TURSO_TOKEN ?? '';
+  const db = createTursoDb({ tursoUrl, tursoToken, mode: 'embedded', localDbPath: dbPath });
+  const eventQueue = new TursoEventQueue(db);
+  await eventQueue.initialize();
+
+  // Session store stays on a separate local SQLite file — session data is device-local only
+  const sessionStore = new SqliteSessionSummaryStore(join(configDir, 'session.db'));
+  sessionStore.migrate();
 
   const projection = new LocalProjection();
   const deviceId = getDeviceId();
@@ -78,12 +86,15 @@ export async function compose(): Promise<Composition> {
   const logs = new LocalLogsAdapter(eventQueue, projection, syncEngine, deviceId);
   const todos = new LocalTodosAdapter(eventQueue, projection, syncEngine, deviceId);
 
-  // Seed the projection from the last known Notion snapshot
-  const cachedSnapshot = eventQueue.loadSnapshot();
+  // Seed the projection from the last known Notion snapshot.
+  // Fetch both before touching the projection so there is no async gap
+  // between loadFromSnapshot and applyAll (a gap would allow a concurrent
+  // nudge → flush write to be cleared and permanently lost).
+  const [cachedSnapshot, pendingEvents] = await Promise.all([
+    eventQueue.loadSnapshot(),
+    eventQueue.pendingSync(),
+  ]);
   projection.loadFromSnapshot(cachedSnapshot);
-
-  // Apply any locally-queued writes on top of the cached snapshot
-  const pendingEvents = eventQueue.pendingSync();
   projection.applyAll(pendingEvents);
 
   // Re-hydrate from Notion in the background — does not block app startup

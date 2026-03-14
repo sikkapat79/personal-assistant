@@ -33,6 +33,8 @@ export interface Settings {
   NOTION_TODOS_IN_PROGRESS_VALUE?: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
+  TURSO_URL?: string;
+  TURSO_TOKEN?: string;
 }
 
 const FILENAME = 'settings.json';

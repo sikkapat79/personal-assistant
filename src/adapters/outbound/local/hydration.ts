@@ -40,14 +40,16 @@ export async function hydrateFromNotion(
     return; // App continues with existing local snapshot
   }
 
-  queue.saveSnapshot(todos, logs);
+  await queue.saveSnapshot(todos, logs);
 
-  const snapshot = queue.loadSnapshot();
-  // loadFromSnapshot and applyAll must stay synchronous with no await between them.
-  // loadFromSnapshot clears the projection; applyAll re-applies pending local writes.
-  // An await here would allow a concurrent write (via nudge → flush) to be cleared
-  // by the subsequent loadFromSnapshot and permanently lost from the projection.
+  // Fetch both snapshot and pending events before touching the projection.
+  // loadFromSnapshot and applyAll must execute without any await between them —
+  // an async gap would allow a concurrent write (via nudge → flush) to be cleared
+  // by loadFromSnapshot and permanently lost from the projection.
+  const [snapshot, pendingEvents] = await Promise.all([
+    queue.loadSnapshot(),
+    queue.pendingSync(),
+  ]);
   projection.loadFromSnapshot(snapshot);
-  const pendingEvents = queue.pendingSync();
   projection.applyAll(pendingEvents);
 }
