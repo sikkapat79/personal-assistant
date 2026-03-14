@@ -41,6 +41,10 @@ class ApiClient {
 
   constructor() {
     this.base = import.meta.env.VITE_API_URL ?? '';
+    // TODO(#21): VITE_API_TOKEN is a temporary dev-only scaffold — a bearer token
+    // baked into the client bundle is not suitable for production. Once Better Auth
+    // is implemented (#21), auth will use httpOnly session cookies issued by the
+    // server and this env var (and the Authorization header below) can be removed.
     this.token = import.meta.env.VITE_API_TOKEN ?? '';
   }
 
@@ -78,8 +82,8 @@ class ApiClient {
     });
   }
 
-  updateTodo(id: string, patch: UpdateTodoInput): Promise<TodoItem> {
-    return this.request<TodoItem>(`/api/todos/${id}`, {
+  updateTodo(id: string, patch: UpdateTodoInput): Promise<{ ok: true }> {
+    return this.request<{ ok: true }>(`/api/todos/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
     });

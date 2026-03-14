@@ -1,17 +1,17 @@
 import { compose } from '../../../../composition';
 import type { Composition } from '../../../../composition';
-import type { TodoAddInputDto } from '../../../../application/todo/todo-dto';
-import type { TodoUpdatePatch } from '../../../../application/todo/todo-update-patch';
-import { join } from 'path';
+import type { TodoAddInputDto } from '@app/todo/todo-dto';
+import type { TodoUpdatePatch } from '@app/todo/todo-update-patch';
+import { join, resolve } from 'path';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const AUTH_TOKEN = process.env.WEB_AUTH_TOKEN ?? '';
 const PUBLIC_DIR = join(import.meta.dir, 'public');
 
-let composition: Composition | null = null;
-async function getComposition(): Promise<Composition> {
-  if (!composition) composition = await compose();
-  return composition;
+let compositionPromise: Promise<Composition> | null = null;
+function getComposition(): Promise<Composition> {
+  compositionPromise = compositionPromise ?? compose();
+  return compositionPromise;
 }
 
 function unauthorized(): Response {
@@ -42,9 +42,14 @@ function checkAuth(req: Request): boolean {
 }
 
 async function serveStatic(pathname: string): Promise<Response> {
-  const clean = pathname.split('?')[0];
-  const filePath = join(PUBLIC_DIR, clean === '/' ? 'index.html' : clean);
-  const file = Bun.file(filePath);
+  const decoded = decodeURIComponent(pathname.split('?')[0]).replace(/\0/g, '');
+  const resolved = resolve(join(PUBLIC_DIR, decoded));
+  if (!resolved.startsWith(PUBLIC_DIR)) {
+    // Path traversal attempt — serve SPA shell instead
+    return new Response(Bun.file(join(PUBLIC_DIR, 'index.html')));
+  }
+  const target = resolved === PUBLIC_DIR ? join(PUBLIC_DIR, 'index.html') : resolved;
+  const file = Bun.file(target);
   if (await file.exists()) return new Response(file);
   return new Response(Bun.file(join(PUBLIC_DIR, 'index.html')));
 }
@@ -75,7 +80,12 @@ Bun.serve({
       }
 
       if (method === 'POST' && pathname === '/api/todos') {
-        const body = await req.json() as TodoAddInputDto;
+        let body: TodoAddInputDto;
+        try {
+          body = await req.json() as TodoAddInputDto;
+        } catch {
+          return json({ error: 'Malformed JSON' }, 400);
+        }
         const todo = await c.todosUseCase.add(body);
         return json(todo, 201);
       }
@@ -83,7 +93,12 @@ Bun.serve({
       const patchMatch = /^\/api\/todos\/([^/]+)$/.exec(pathname);
       if (method === 'PATCH' && patchMatch) {
         const id = patchMatch[1]!;
-        const patch = await req.json() as TodoUpdatePatch;
+        let patch: TodoUpdatePatch;
+        try {
+          patch = await req.json() as TodoUpdatePatch;
+        } catch {
+          return json({ error: 'Malformed JSON' }, 400);
+        }
         await c.todosUseCase.updateByIdOrIndex(id, patch);
         return json({ ok: true });
       }
