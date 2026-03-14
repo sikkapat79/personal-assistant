@@ -42,7 +42,7 @@ features/pomodoro/
 
 ## Routing
 
-Not added until the first real multi-page feature lands. When needed, use **react-router-dom** with `BrowserRouter`. Add it to `dependencies`, configure routes in `App.tsx`. Do not use file-based routing frameworks.
+**react-router-dom** (v7) with `BrowserRouter`. Routes are declared in `App.tsx`. Do not use file-based routing frameworks. Add new `<Route>` entries in `App.tsx` when a feature's page component is ready.
 
 ## State management
 
