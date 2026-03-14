@@ -7,7 +7,9 @@ import { useChat } from './hooks/useChat';
 import { useDataFetching } from './hooks/useDataFetching';
 import { useAppKeyboard } from './hooks/useAppKeyboard';
 import { loadSettings } from '../../../../config/settings';
+import { loadProfile } from '../../../../config/profile';
 import { SETUP_STEPS } from './constants/setup';
+import { findFirstIncompleteStep } from './hooks/keyboard/setupKeys';
 import { SettingsPageContent } from './settings/SettingsPageContent';
 import { FirstRunSetupContent } from './settings/FirstRunSetupContent';
 import { TaskDetailPageContent } from './tasks/TaskDetailPageContent';
@@ -45,7 +47,9 @@ export function App({ composeFn, onConfigSaved }: AppProps) {
   const [displayNameInput, setDisplayNameInput] = useState(resolved.profile.displayName);
   const [savedDisplayName, setSavedDisplayName] = useState(resolved.profile.displayName);
   const [settingsTab, setSettingsTab] = useState<'profile' | 'api-keys'>('profile');
-  const [setupStep, setSetupStep] = useState(0);
+  const [setupStep, setSetupStep] = useState(() =>
+    hasRequiredConfig() ? 0 : findFirstIncompleteStep(loadSettings(), loadProfile().displayName)
+  );
   const [setupInput, setSetupInput] = useState('');
   const [apiKeysSelectedRow, setApiKeysSelectedRow] = useState(0);
   const [apiKeysEditingIndex, setApiKeysEditingIndex] = useState<number | null>(null);

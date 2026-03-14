@@ -64,7 +64,7 @@ export async function compose(): Promise<Composition> {
 
   // Local-first layer: Turso (libSQL) event queue + in-memory projection
   const configDir = getConfigDir();
-  const dbPath = join(configDir, 'pax.db');
+  const dbPath = join(configDir, 'turso.db');
   const tursoUrl = settings.TURSO_URL ?? '';
   const tursoToken = settings.TURSO_TOKEN ?? '';
   const db = createTursoDb({ tursoUrl, tursoToken, mode: 'embedded', localDbPath: dbPath });

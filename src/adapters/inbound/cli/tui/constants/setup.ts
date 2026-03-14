@@ -1,8 +1,17 @@
 import { AGENT_NAME } from '../../../../../config/branding';
 import type { Settings } from '../../../../../config/settings';
 
+/** Settings keys that must be present for the app to start. */
+export const MANDATORY_SETTING_KEYS = new Set<keyof Settings>([
+  'NOTION_API_KEY',
+  'NOTION_LOGS_DATABASE_ID',
+  'NOTION_TODOS_DATABASE_ID',
+  'TURSO_URL',
+  'TURSO_TOKEN',
+]);
+
 /** Keys that hold secrets and should be masked in the UI. */
-export const SECRET_KEYS = new Set<string>(['NOTION_API_KEY', 'OPENAI_API_KEY']);
+export const SECRET_KEYS = new Set<string>(['NOTION_API_KEY', 'OPENAI_API_KEY', 'TURSO_TOKEN']);
 
 type SettingsStep = { type: 'settings'; key: keyof Settings; tab: string; label: string };
 type ProfileStep = { type: 'profile'; key: 'displayName'; tab: string; label: string };
@@ -16,6 +25,8 @@ export const SETUP_STEPS: SetupStep[] = [
   { type: 'settings', key: 'NOTION_LOGS_DATABASE_ID', tab: 'Logs DB', label: 'Notion Logs database ID (from the database URL)' },
   { type: 'settings', key: 'NOTION_TODOS_DATABASE_ID', tab: 'TODOs DB', label: 'Notion TODOs database ID (from the database URL)' },
   { type: 'settings', key: 'NOTION_METADATA_DATABASE_ID', tab: 'Metadata DB', label: 'Notion Metadata database ID' },
+  { type: 'settings', key: 'TURSO_URL', tab: 'Turso URL', label: 'Turso database URL (libsql://your-db.turso.io)' },
+  { type: 'settings', key: 'TURSO_TOKEN', tab: 'Turso token', label: 'Turso auth token' },
 ];
 
 /** Settings-only steps, used for the API Keys tab in settings page. */

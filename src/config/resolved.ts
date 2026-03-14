@@ -78,6 +78,8 @@ export function hasRequiredConfig(): boolean {
   return !!(
     s.NOTION_API_KEY &&
     s.NOTION_LOGS_DATABASE_ID &&
-    s.NOTION_TODOS_DATABASE_ID
+    s.NOTION_TODOS_DATABASE_ID &&
+    s.TURSO_URL &&
+    s.TURSO_TOKEN
   );
 }
