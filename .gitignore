@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+src/adapters/inbound/web/server/public/
 
 # Environment and secrets
 .env
