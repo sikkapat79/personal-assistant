@@ -49,6 +49,7 @@
     "@notionhq/client": "^2.2.15",
     "@opentui/core": "^0.1.81",
     "@opentui/react": "^0.1.81",
+    "better-auth": "^1.5.5",
     "dayjs": "^1.11.13",
     "drizzle-orm": "^0.45.1",
     "express": "^4.18.2",

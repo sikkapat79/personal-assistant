@@ -1,18 +1,33 @@
-import { compose } from '../../../../composition';
-import type { Composition } from '../../../../composition';
 import type { TodoAddInputDto } from '@app/todo/todo-dto';
 import type { TodoUpdatePatch } from '@app/todo/todo-update-patch';
 import { join, resolve, relative } from 'path';
+import { migrate } from 'drizzle-orm/libsql/migrator';
+import { createTursoDb } from '../../../../adapters/outbound/turso/client';
+import { getResolvedConfig } from '../../../../config/resolved';
+import { getConfigDir } from '../../../../config/config-dir';
+import { createAuth } from './auth';
+import { getCompositionForUser } from './user-composition';
 
 const PORT = Number(process.env.PORT ?? 3001);
-const AUTH_TOKEN = process.env.WEB_AUTH_TOKEN ?? '';
 const PUBLIC_DIR = join(import.meta.dir, 'public');
+const OWNER_EMAIL = process.env.OWNER_EMAIL ?? '';
 
-let compositionPromise: Promise<Composition> | null = null;
-function getComposition(): Promise<Composition> {
-  compositionPromise = compositionPromise ?? compose();
-  return compositionPromise;
-}
+const { settings } = getResolvedConfig();
+const configDir = getConfigDir();
+const dbPath = join(configDir, 'turso.db');
+const db = createTursoDb({
+  tursoUrl: settings.TURSO_URL ?? '',
+  tursoToken: settings.TURSO_TOKEN ?? '',
+  mode: 'embedded',
+  localDbPath: dbPath,
+});
+
+// Run migrations once at startup before serving any request
+await migrate(db, {
+  migrationsFolder: join(import.meta.dir, '../../../../adapters/outbound/turso/migrations'),
+});
+
+const auth = createAuth(db);
 
 function unauthorized(): Response {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -33,12 +48,6 @@ function notFound(): Response {
     status: 404,
     headers: { 'Content-Type': 'application/json' },
   });
-}
-
-function checkAuth(req: Request): boolean {
-  if (!AUTH_TOKEN) return true;
-  const header = req.headers.get('Authorization') ?? '';
-  return header === `Bearer ${AUTH_TOKEN}`;
 }
 
 async function serveStatic(pathname: string): Promise<Response> {
@@ -62,10 +71,18 @@ Bun.serve({
     const { pathname } = url;
     const method = req.method.toUpperCase();
 
-    if (pathname.startsWith('/api/')) {
-      if (!checkAuth(req)) return unauthorized();
+    // Better Auth owns all /api/auth/* routes
+    if (pathname.startsWith('/api/auth/')) {
+      return auth.handler(req);
+    }
 
-      const c = await getComposition();
+    if (pathname.startsWith('/api/')) {
+      const session = await auth.api.getSession({ headers: req.headers });
+      if (!session) return unauthorized();
+
+      const userId = session.user.id;
+      const isOwner = session.user.email === OWNER_EMAIL;
+      const c = await getCompositionForUser(db, userId, isOwner);
 
       if (method === 'GET' && pathname === '/api/today') {
         const todos = await c.todosUseCase.listOpen();

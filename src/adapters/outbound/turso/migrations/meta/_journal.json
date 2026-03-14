@@ -15,6 +15,13 @@
       "when": 1773461454383,
       "tag": "0001_same_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1773488545049,
+      "tag": "0002_cool_slyde",
+      "breakpoints": true
     }
   ]
 }

@@ -52,6 +52,12 @@ function mergedSettings(): Settings {
     OPENAI_MODEL: process.env.OPENAI_MODEL ?? file.OPENAI_MODEL,
     TURSO_URL: process.env.TURSO_URL ?? file.TURSO_URL,
     TURSO_TOKEN: process.env.TURSO_TOKEN ?? file.TURSO_TOKEN,
+    OWNER_EMAIL: process.env.OWNER_EMAIL ?? file.OWNER_EMAIL,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? file.BETTER_AUTH_SECRET,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? file.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? file.GOOGLE_CLIENT_SECRET,
+    LINE_CLIENT_ID: process.env.LINE_CLIENT_ID ?? file.LINE_CLIENT_ID,
+    LINE_CLIENT_SECRET: process.env.LINE_CLIENT_SECRET ?? file.LINE_CLIENT_SECRET,
   };
 }
 
