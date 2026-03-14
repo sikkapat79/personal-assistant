@@ -14,7 +14,7 @@ CREATE TABLE `events` (
 	`synced` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_events_unsynced` ON `events` (`synced`,`timestamp`);--> statement-breakpoint
+CREATE INDEX `idx_events_unsynced` ON `events` (`synced`,`id`);--> statement-breakpoint
 CREATE INDEX `idx_events_type_timestamp` ON `events` (`event_type`,`timestamp`);--> statement-breakpoint
 CREATE INDEX `idx_events_entity_id_id` ON `events` (`entity_id`,`id`);--> statement-breakpoint
 CREATE TABLE `snapshot_logs` (
