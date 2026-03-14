@@ -89,8 +89,8 @@ class ApiClient {
     });
   }
 
-  completeTodo(id: string): Promise<void> {
-    return this.request<void>(`/api/todos/${id}/complete`, { method: 'POST' });
+  completeTodo(id: string): Promise<{ ok: true }> {
+    return this.request<{ ok: true }>(`/api/todos/${id}/complete`, { method: 'POST' });
   }
 }
 
