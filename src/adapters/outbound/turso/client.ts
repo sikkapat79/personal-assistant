@@ -9,6 +9,12 @@ export function createTursoDb(opts: {
   /** Required when mode is 'embedded'. Path to the local SQLite replica file. */
   localDbPath?: string;
 }) {
+  if (!opts.tursoUrl?.trim()) {
+    throw new Error('createTursoDb: tursoUrl is required and must not be empty');
+  }
+  if (!opts.tursoToken?.trim()) {
+    throw new Error('createTursoDb: tursoToken is required and must not be empty');
+  }
   if (opts.mode === 'embedded' && !opts.localDbPath) {
     throw new Error('createTursoDb: localDbPath is required for embedded mode');
   }

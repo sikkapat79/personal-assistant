@@ -43,7 +43,7 @@ export class LocalTodosAdapter extends LocalAdapterBase implements ITodosReposit
       ids.map(async (id) => {
         // Prefer live projection (task still in-memory after completion)
         const fromProjection = this.projection.todos.get(id);
-        if (fromProjection) return fromProjection;
+        if (fromProjection) return { ...fromProjection };
         // Fallback: rebuild from events (covers post-hydration or post-sync cases)
         const entityEvents = await this.queue.getEventsForEntity(id);
         return rebuildTodoFromEvents(entityEvents);

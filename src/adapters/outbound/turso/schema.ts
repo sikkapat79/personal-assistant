@@ -15,6 +15,7 @@ export const events = sqliteTable(
   (t) => [
     index('idx_events_unsynced').on(t.synced, t.timestamp),
     index('idx_events_type_timestamp').on(t.eventType, t.timestamp),
+    index('idx_events_entity_id_id').on(t.entityId, t.id),
   ]
 );
 

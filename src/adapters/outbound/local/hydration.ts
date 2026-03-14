@@ -46,10 +46,17 @@ export async function hydrateFromNotion(
   // loadFromSnapshot and applyAll must execute without any await between them —
   // an async gap would allow a concurrent write (via nudge → flush) to be cleared
   // by loadFromSnapshot and permanently lost from the projection.
-  const [snapshot, pendingEvents] = await Promise.all([
-    queue.loadSnapshot(),
-    queue.pendingSync(),
-  ]);
+  let snapshot: Awaited<ReturnType<typeof queue.loadSnapshot>>;
+  let pendingEvents: Awaited<ReturnType<typeof queue.pendingSync>>;
+  try {
+    [snapshot, pendingEvents] = await Promise.all([
+      queue.loadSnapshot(),
+      queue.pendingSync(),
+    ]);
+  } catch (err) {
+    console.error('[hydration] Failed to load snapshot/pending from queue:', err instanceof Error ? err.message : String(err));
+    return; // Projection retains its current state; app continues normally
+  }
   projection.loadFromSnapshot(snapshot);
   projection.applyAll(pendingEvents);
 }

@@ -73,7 +73,6 @@ export async function compose(): Promise<Composition> {
 
   // Session store stays on a separate local SQLite file — session data is device-local only
   const sessionStore = new SqliteSessionSummaryStore(join(configDir, 'session.db'));
-  sessionStore.migrate();
 
   const projection = new LocalProjection();
   const deviceId = getDeviceId();

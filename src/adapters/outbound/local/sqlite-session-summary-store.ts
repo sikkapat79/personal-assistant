@@ -16,9 +16,10 @@ export class SqliteSessionSummaryStore implements ISessionSummaryStore {
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath, { create: true });
+    this.migrate();
   }
 
-  migrate(): void {
+  private migrate(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS session_summary (
         id         INTEGER PRIMARY KEY CHECK (id = 1),
