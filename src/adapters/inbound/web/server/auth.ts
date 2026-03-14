@@ -9,6 +9,7 @@ export function createAuth(db: TursoDb) {
   const ownerEmail = process.env.OWNER_EMAIL ?? '';
   const secret = process.env.BETTER_AUTH_SECRET ?? '';
   if (!secret) throw new Error('BETTER_AUTH_SECRET is required');
+  if (!ownerEmail) throw new Error('OWNER_EMAIL is required');
 
   return betterAuth({
     secret,
@@ -49,10 +50,17 @@ export function createAuth(db: TursoDb) {
           after: async (user) => {
             // Owner first login: backfill all legacy rows that have no user_id
             if (user.email === ownerEmail) {
-              await db.update(events).set({ userId: user.id }).where(isNull(events.userId));
-              await db.update(snapshotTodos).set({ userId: user.id }).where(isNull(snapshotTodos.userId));
-              await db.update(snapshotLogs).set({ userId: user.id }).where(isNull(snapshotLogs.userId));
-              await db.update(entityIdMap).set({ userId: user.id }).where(isNull(entityIdMap.userId));
+              try {
+                await db.update(events).set({ userId: user.id }).where(isNull(events.userId));
+                await db.update(snapshotTodos).set({ userId: user.id }).where(isNull(snapshotTodos.userId));
+                await db.update(snapshotLogs).set({ userId: user.id }).where(isNull(snapshotLogs.userId));
+                await db.update(entityIdMap).set({ userId: user.id }).where(isNull(entityIdMap.userId));
+              } catch (err) {
+                console.error(
+                  '[auth] CRITICAL: Owner data backfill failed —',
+                  err instanceof Error ? err.message : String(err)
+                );
+              }
             }
           },
         },
