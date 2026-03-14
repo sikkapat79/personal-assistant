@@ -1,4 +1,4 @@
-import { eq, inArray, gte, asc, and, notInArray } from 'drizzle-orm';
+import { eq, inArray, gte, asc, and, notInArray, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import { join } from 'path';
 import type { IEventQueue } from '@app/shared/event-queue.port';
@@ -67,24 +67,28 @@ export class TursoEventQueue implements IEventQueue {
     const now = new Date().toISOString();
 
     await this.db.transaction(async (tx) => {
-      for (const todo of todos) {
-        if (!todo.id) throw new Error('Snapshot received a todo with no id — invariant violation');
+      if (todos.length > 0) {
+        const todoRows = todos.map((todo) => {
+          if (!todo.id) throw new Error('Snapshot received a todo with no id — invariant violation');
+          return { notionId: todo.id, data: JSON.stringify(todo), fetchedAt: now };
+        });
         await tx
           .insert(snapshotTodos)
-          .values({ notionId: todo.id, data: JSON.stringify(todo), fetchedAt: now })
+          .values(todoRows)
           .onConflictDoUpdate({
             target: snapshotTodos.notionId,
-            set: { data: JSON.stringify(todo), fetchedAt: now },
+            set: { data: sql`excluded.data`, fetchedAt: sql`excluded.fetched_at` },
           });
       }
 
-      for (const log of logs) {
+      if (logs.length > 0) {
+        const logRows = logs.map((log) => ({ date: log.date, data: JSON.stringify(log), fetchedAt: now }));
         await tx
           .insert(snapshotLogs)
-          .values({ date: log.date, data: JSON.stringify(log), fetchedAt: now })
+          .values(logRows)
           .onConflictDoUpdate({
             target: snapshotLogs.date,
-            set: { data: JSON.stringify(log), fetchedAt: now },
+            set: { data: sql`excluded.data`, fetchedAt: sql`excluded.fetched_at` },
           });
       }
 
@@ -92,7 +96,7 @@ export class TursoEventQueue implements IEventQueue {
       if (todos.length === 0) {
         await tx.delete(snapshotTodos);
       } else {
-        const ids = todos.map((t) => t.id);
+        const ids = todos.map((t) => t.id!);
         await tx.delete(snapshotTodos).where(notInArray(snapshotTodos.notionId, ids));
       }
 
