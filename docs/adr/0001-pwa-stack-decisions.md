@@ -8,54 +8,22 @@
 
 ## 1. Vite over Next.js
 
-**Decision**: Use Vite + React 19, not Next.js.
+Pax is a personal productivity tool with no public-facing pages. SSR and SSG add no value. The backend is already a Bun HTTP server — we don't need Next.js's API routes on top of that. Vite fits naturally into the Bun toolchain and keeps the mental model simple: one bundler, one server, no framework conventions.
 
-**Alternatives considered**:
-- Next.js (App Router): SSR/SSG, file-based routing, built-in API routes, large ecosystem
-- Vite: bundler/dev server only; no opinions on routing or data fetching
-
-**Reasons for Vite**:
-- Pax is a personal productivity tool with no public-facing pages — SSR and SSG add zero value
-- The backend is a Bun HTTP server (`server/index.ts`); we don't need Next.js's API routes duplicating that
-- Vite integrates cleanly with Bun's native toolchain and `bun run` scripts
-- Significantly simpler mental model: no `"use client"` / `"use server"` split, no App Router conventions to learn or maintain
-
-**Trade-offs accepted**:
-- No SSR. Any SEO or first-paint requirements in future would require revisiting.
-- File-based routing not available; routes are declared manually in `App.tsx`.
+If Pax ever needs SSR or a public-facing surface, revisit.
 
 ---
 
-## 2. Manual fetch wrapper over axios
+## 2. Thin fetch wrapper, not axios
 
-**Decision**: Use a thin typed fetch wrapper (`lib/api-client.ts`) instead of axios.
+A small typed wrapper around `fetch` covers everything we need: base URL, auth header, error surfacing with status and body. Axios adds ~14 KB for interceptors and cancellation we don't use. The wrapper lives in `lib/api-client.ts` and is the only way features talk to the server.
 
-**Alternatives considered**:
-- axios: interceptors, automatic JSON parsing, request cancellation, wider browser support
-- fetch (native): no dependency, explicit control
-
-**Reasons for fetch wrapper**:
-- No interceptor logic needed at this stage
-- Request cancellation (AbortController) not yet required
-- axios adds ~14 KB to the bundle for features we don't use
-- The wrapper already handles the only things we need: base URL injection, auth header, error surfacing with status + body
-
-**Trade-offs accepted**:
-- If cross-cutting concerns (auth refresh, retry, logging) grow, an axios migration or a custom interceptor layer may be warranted.
+If cross-cutting concerns (retry, auth refresh, logging) grow, reconsider.
 
 ---
 
-## 3. VITE_API_TOKEN as temporary auth scaffold
+## 3. VITE_API_TOKEN is a temporary scaffold
 
-**Decision**: Bundle a bearer token (`VITE_API_TOKEN`) in the Vite client env as a short-term auth mechanism. Will be removed when issue #21 (Better Auth) lands.
+The server requires a bearer token on all `/api/*` routes via `WEB_AUTH_TOKEN`. During development the client needs to send it. Baking it into the Vite env (`VITE_API_TOKEN`) is the simplest way to wire that up before proper auth exists.
 
-**Why it exists now**:
-- The Bun server already validates `WEB_AUTH_TOKEN` via `Authorization: Bearer` header
-- The client needs to send that token on every request during development
-- Without issue #21's session infrastructure, there is no safe per-user auth flow yet
-
-**Why it's temporary**:
-- A bearer token baked into a client bundle is not suitable for production: it's visible in source maps, the bundle, and browser devtools
-- Issue #21 will replace this with httpOnly session cookies issued by the server after OAuth (Google + Line)
-
-**Removal criteria**: once `#21` ships, delete `VITE_API_TOKEN` from `.env`, remove the `this.token` field and `Authorization` header from `ApiClient`, and remove the `TODO(#21)` comment in `api-client.ts`.
+This is not suitable for production — the token is visible in the bundle and devtools. Once issue #21 (Better Auth, Google + Line OAuth) ships, `VITE_API_TOKEN` goes away and auth moves to httpOnly session cookies issued by the server. The `TODO(#21)` comment in `api-client.ts` marks exactly what to remove.
