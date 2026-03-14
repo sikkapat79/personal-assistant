@@ -60,6 +60,8 @@ export function FirstRunSetupContent({
           <text fg={designTokens.color.muted}>{'Logs DB:           ' + (settings?.NOTION_LOGS_DATABASE_ID || 'Not set')}</text>
           <text fg={designTokens.color.muted}>{'TODOs DB:          ' + (settings?.NOTION_TODOS_DATABASE_ID || 'Not set')}</text>
           <text fg={designTokens.color.muted}>{'Metadata DB:       ' + (settings?.NOTION_METADATA_DATABASE_ID || 'Not set')}</text>
+          <text fg={designTokens.color.muted}>{'Turso URL:         ' + (settings?.TURSO_URL || 'Not set')}</text>
+          <text fg={designTokens.color.muted}>{'Turso token:       ' + maskSecret(settings?.TURSO_TOKEN)}</text>
         </box>
         <box style={{ marginTop: 1 }}>
           <text fg={designTokens.color.muted}>Enter / Tab: go to Pax</text>

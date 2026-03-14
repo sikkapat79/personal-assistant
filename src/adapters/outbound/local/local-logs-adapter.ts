@@ -53,11 +53,11 @@ export class LocalLogsAdapter extends LocalAdapterBase implements ILogsRepositor
       tomorrow: content.tomorrow,
     };
     // entity_id for daily logs is the date string — stable identity in Notion
-    this.write(log.date, EventType.DailyLogUpserted, payload);
+    await this.write(log.date, EventType.DailyLogUpserted, payload);
     // Write-through: persist to snapshot immediately so the log survives a
     // restart even after the event is synced (synced=1 events are excluded
     // from pendingSync() and would otherwise vanish from the projection).
-    this.queue.upsertSnapshotLog(log);
+    await this.queue.upsertSnapshotLog(log);
   }
 }
 

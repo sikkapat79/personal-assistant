@@ -141,6 +141,7 @@ export function useAppKeyboard(params: AppKeyboardParams): void {
       handleSetupKey(key, {
         setupStep: setupStepRef.current,
         setupInput: setupInputRef.current,
+        currentDisplayName: resolvedRef.current.profile.displayName,
         setSetupStep: params.setSetupStep,
         setSetupInput: params.setSetupInput,
         setSavedDisplayName: params.setSavedDisplayName,

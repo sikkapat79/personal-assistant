@@ -56,14 +56,14 @@ export class SyncEngine {
   }
 
   private async processPendingEvents(): Promise<void> {
-    const pendingEvents = this.queue.pendingSync();
+    const pendingEvents = await this.queue.pendingSync();
     if (pendingEvents.length === 0) return;
 
     // Load persisted mappings from the queue, then maintain a mutable batch map
     // that is updated immediately when a todo.created syncs within this flush.
     // This ensures subsequent events in the same batch resolve the correct Notion
     // page id rather than the local UUID (EntityIdMap is a point-in-time snapshot).
-    const persistedMap = this.queue.getEntityIdMap();
+    const persistedMap = await this.queue.getEntityIdMap();
     const batchIdMap = new Map<string, string>();
 
     const resolveId = (localId: string): string =>
@@ -120,7 +120,7 @@ export class SyncEngine {
     }
 
     if (syncedIds.length > 0) {
-      this.queue.markSynced(syncedIds);
+      await this.queue.markSynced(syncedIds);
     }
   }
 
@@ -187,7 +187,7 @@ export class SyncEngine {
     const created = await this.notionTodos.add(todo);
     // Persist the local UUID → Notion page id mapping, then record it in the
     // batch map so subsequent events in this flush resolve the correct id.
-    this.queue.persistEntityIdMapping(event.entity_id, created.id);
+    await this.queue.persistEntityIdMapping(event.entity_id, created.id);
     batchIdMap.set(event.entity_id, created.id);
   }
 

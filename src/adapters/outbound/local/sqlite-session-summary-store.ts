@@ -15,7 +15,25 @@ export class SqliteSessionSummaryStore implements ISessionSummaryStore {
   private readonly db: Database;
 
   constructor(dbPath: string) {
-    this.db = new Database(dbPath);
+    this.db = new Database(dbPath, { create: true });
+    this.migrate();
+  }
+
+  private migrate(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS session_summary (
+        id         INTEGER PRIMARY KEY CHECK (id = 1),
+        summary    TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS session_messages (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        role       TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+        content    TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
   }
 
   load(): string | null {

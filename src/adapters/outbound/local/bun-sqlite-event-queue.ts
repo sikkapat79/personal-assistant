@@ -51,7 +51,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     this.db.exec(sql);
   }
 
-  append(event: StoredEvent): void {
+  async append(event: StoredEvent): Promise<void> {
     const stmt = this.db.prepare(
       `INSERT OR IGNORE INTO events (id, entity_type, entity_id, event_type, payload, timestamp, device_id, synced)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
@@ -68,7 +68,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     );
   }
 
-  pendingSync(): StoredEvent[] {
+  async pendingSync(): Promise<StoredEvent[]> {
     // Event ids are UUID v7 — lexicographic order equals creation order.
     // Sorting by id gives deterministic replay even for events created within
     // the same millisecond (where timestamp alone would be a tie).
@@ -82,7 +82,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     return rows.map(rowToStoredEvent);
   }
 
-  markSynced(ids: string[]): void {
+  async markSynced(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     // SQLite placeholders must be inlined for dynamic IN clause
     const placeholders = ids.map(() => '?').join(', ');
@@ -92,7 +92,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     stmt.run(...ids);
   }
 
-  loadSnapshot(): { todos: Todo[]; logs: DailyLog[] } {
+  async loadSnapshot(): Promise<{ todos: Todo[]; logs: DailyLog[] }> {
     const todoRows = this.db
       .prepare('SELECT notion_id, data, fetched_at FROM snapshot_todos')
       .all() as SnapshotTodoRow[];
@@ -107,7 +107,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     return { todos, logs };
   }
 
-  saveSnapshot(todos: Todo[], logs: DailyLog[]): void {
+  async saveSnapshot(todos: Todo[], logs: DailyLog[]): Promise<void> {
     const now = new Date().toISOString();
 
     const insertTodo = this.db.prepare(
@@ -153,7 +153,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     saveTodosAndLogs();
   }
 
-  upsertSnapshotLog(log: DailyLog): void {
+  async upsertSnapshotLog(log: DailyLog): Promise<void> {
     const now = new Date().toISOString();
     this.db
       .prepare(
@@ -164,7 +164,7 @@ export class BunSqliteEventQueue implements IEventQueue {
       .run(log.date, JSON.stringify(log), now);
   }
 
-  getEntityIdMap(): EntityIdMap {
+  async getEntityIdMap(): Promise<EntityIdMap> {
     const rows = this.db
       .prepare('SELECT local_id, notion_id FROM entity_id_map')
       .all() as EntityIdMapRow[];
@@ -176,7 +176,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     return map;
   }
 
-  listCompletedTodayIds(sinceUtc: string): string[] {
+  async listCompletedTodayIds(sinceUtc: string): Promise<string[]> {
     // sinceUtc is start of local today in UTC (e.g. '2026-03-13T07:00:00.000Z' for UTC+7)
     // No upper bound needed — tasks cannot be marked done in the future
     const rows = this.db
@@ -187,7 +187,7 @@ export class BunSqliteEventQueue implements IEventQueue {
     return rows.map((r) => r.entity_id);
   }
 
-  getEventsForEntity(entityId: string): StoredEvent[] {
+  async getEventsForEntity(entityId: string): Promise<StoredEvent[]> {
     const rows = this.db
       .prepare(`SELECT id, entity_type, entity_id, event_type, payload, timestamp, device_id, synced FROM events WHERE entity_id = ? ORDER BY id ASC`)
       .all(entityId) as EventRow[];
@@ -195,7 +195,7 @@ export class BunSqliteEventQueue implements IEventQueue {
   }
 
   /** Persists a local → Notion id mapping to the database. */
-  persistEntityIdMapping(localId: string, notionId: string): void {
+  async persistEntityIdMapping(localId: string, notionId: string): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO entity_id_map (local_id, notion_id)

@@ -12,7 +12,7 @@ export abstract class LocalAdapterBase {
     protected readonly deviceId: string
   ) {}
 
-  protected write(entityId: string, eventType: EventType, payload: EventPayload): StoredEvent {
+  protected async write(entityId: string, eventType: EventType, payload: EventPayload): Promise<void> {
     const event: StoredEvent = {
       id: Bun.randomUUIDv7(),
       entity_type: this.entityType,
@@ -23,9 +23,8 @@ export abstract class LocalAdapterBase {
       device_id: this.deviceId,
       synced: 0,
     };
-    this.queue.append(event);
+    await this.queue.append(event);
     this.projection.apply(event);
     this.sync.nudge();
-    return event;
   }
 }
