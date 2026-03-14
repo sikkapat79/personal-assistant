@@ -2,7 +2,7 @@ import { compose } from '../../../../composition';
 import type { Composition } from '../../../../composition';
 import type { TodoAddInputDto } from '@app/todo/todo-dto';
 import type { TodoUpdatePatch } from '@app/todo/todo-update-patch';
-import { join, resolve } from 'path';
+import { join, resolve, relative } from 'path';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const AUTH_TOKEN = process.env.WEB_AUTH_TOKEN ?? '';
@@ -44,7 +44,8 @@ function checkAuth(req: Request): boolean {
 async function serveStatic(pathname: string): Promise<Response> {
   const decoded = decodeURIComponent(pathname.split('?')[0]).replace(/\0/g, '');
   const resolved = resolve(join(PUBLIC_DIR, decoded));
-  if (!resolved.startsWith(PUBLIC_DIR)) {
+  const rel = relative(PUBLIC_DIR, resolved);
+  if (rel.startsWith('..') || rel.startsWith('/')) {
     // Path traversal attempt — serve SPA shell instead
     return new Response(Bun.file(join(PUBLIC_DIR, 'index.html')));
   }
