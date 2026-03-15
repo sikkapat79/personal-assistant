@@ -1,9 +1,9 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { genericOAuth, line } from 'better-auth/plugins/generic-oauth';
-import { eq, isNull } from 'drizzle-orm';
+import { genericOAuth, line } from 'better-auth/plugins';
+import { eq } from 'drizzle-orm';
 import type { TursoDb } from '../../../../adapters/outbound/turso/client';
-import { events, snapshotTodos, snapshotLogs, entityIdMap, invites, users, sessions, accounts, verifications } from '../../../../adapters/outbound/turso/schema';
+import { invites, users, sessions, accounts, verifications } from '../../../../adapters/outbound/turso/schema';
 
 export function createAuth(db: TursoDb) {
   const ownerEmail = process.env.OWNER_EMAIL ?? '';
@@ -58,24 +58,6 @@ export function createAuth(db: TursoDb) {
               }
             }
             return { data: user };
-          },
-          after: async (user) => {
-            // Owner first login: backfill all legacy rows that have no user_id.
-            // snapshot tables had NULL rows converted to '__unscoped__' by migration 0003;
-            // events table still uses NULL (no NOT NULL constraint added there).
-            if (user.email.toLowerCase() === ownerEmailNormalized) {
-              try {
-                await db.update(events).set({ userId: user.id }).where(isNull(events.userId));
-                await db.update(snapshotTodos).set({ userId: user.id }).where(eq(snapshotTodos.userId, '__unscoped__'));
-                await db.update(snapshotLogs).set({ userId: user.id }).where(eq(snapshotLogs.userId, '__unscoped__'));
-                await db.update(entityIdMap).set({ userId: user.id }).where(eq(entityIdMap.userId, '__unscoped__'));
-              } catch (err) {
-                console.error(
-                  '[auth] CRITICAL: Owner data backfill failed —',
-                  err instanceof Error ? err.message : String(err)
-                );
-              }
-            }
           },
         },
       },

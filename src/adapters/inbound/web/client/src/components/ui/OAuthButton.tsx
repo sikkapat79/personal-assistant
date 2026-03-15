@@ -1,6 +1,8 @@
+import type { ComponentPropsWithoutRef } from 'react';
+
 interface OAuthButtonProps {
   provider: 'google' | 'line';
-  onClick: () => void;
+  onClick: ComponentPropsWithoutRef<'button'>['onClick'];
 }
 
 export function OAuthButton({ provider, onClick }: OAuthButtonProps) {

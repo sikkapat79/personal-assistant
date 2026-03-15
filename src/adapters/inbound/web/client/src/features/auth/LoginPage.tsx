@@ -7,8 +7,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 async function signInWith(provider: 'google' | 'line') {
+  const apiBase = import.meta.env.VITE_API_URL ?? '';
   const endpoint =
-    provider === 'google' ? '/api/auth/sign-in/social' : '/api/auth/sign-in/oauth2';
+    provider === 'google' ? `${apiBase}/api/auth/sign-in/social` : `${apiBase}/api/auth/sign-in/oauth2`;
   const callbackURL = window.location.origin + '/';
   const body =
     provider === 'google'

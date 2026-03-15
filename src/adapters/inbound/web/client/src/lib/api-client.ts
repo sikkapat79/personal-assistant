@@ -61,12 +61,12 @@ class ApiClient {
     this.base = import.meta.env.VITE_API_URL ?? '';
   }
 
-  private async request<Value>(path: string, init?: RequestInit): Promise<Value> {
-    const res = await fetch(`${this.base}${path}`, {
-      ...init,
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-    });
+  private async request<Value>(path: string, init: RequestInit = {}): Promise<Value> {
+    const headers = new Headers(init.headers);
+    if (init.body != null && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    const res = await fetch(`${this.base}${path}`, { ...init, credentials: 'include', headers });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new ApiError(`API ${init?.method ?? 'GET'} ${path} → ${res.status}: ${text}`, res.status);

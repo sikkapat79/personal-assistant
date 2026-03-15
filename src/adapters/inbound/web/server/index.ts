@@ -2,7 +2,7 @@ import type { TodoAddInputDto } from '@app/todo/todo-dto';
 import type { TodoUpdatePatch } from '@app/todo/todo-update-patch';
 import { join, resolve, relative } from 'path';
 import { migrate } from 'drizzle-orm/libsql/migrator';
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
 import { createTursoDb } from '../../../../adapters/outbound/turso/client';
 import { getResolvedConfig } from '../../../../config/resolved';
 import { getConfigDir } from '../../../../config/config-dir';
@@ -76,17 +76,43 @@ new Elysia()
             todos: await c.todosUseCase.listOpen(),
           }))
           .get('/todos', ({ c }) => c.todosUseCase.listOpen())
-          .post('/todos', async ({ c, body }) => {
-            const todo = await c.todosUseCase.add(body as TodoAddInputDto);
-            return new Response(JSON.stringify(todo), {
-              status: 201,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          })
-          .patch('/todos/:id', async ({ c, params, body }) => {
-            await c.todosUseCase.updateByIdOrIndex(params.id, body as TodoUpdatePatch);
-            return { ok: true };
-          })
+          .post(
+            '/todos',
+            async ({ c, body }) => {
+              const todo = await c.todosUseCase.add(body as TodoAddInputDto);
+              return new Response(JSON.stringify(todo), {
+                status: 201,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            },
+            {
+              body: t.Object({
+                title: t.String(),
+                dueDate: t.Optional(t.Nullable(t.String())),
+                category: t.Optional(t.String()),
+                notes: t.Optional(t.String()),
+                priority: t.Optional(t.String()),
+                status: t.Optional(t.String()),
+              }),
+            }
+          )
+          .patch(
+            '/todos/:id',
+            async ({ c, params, body }) => {
+              await c.todosUseCase.updateByIdOrIndex(params.id, body as TodoUpdatePatch);
+              return { ok: true };
+            },
+            {
+              body: t.Object({
+                title: t.Optional(t.String()),
+                dueDate: t.Optional(t.Nullable(t.String())),
+                status: t.Optional(t.String()),
+                category: t.Optional(t.String()),
+                notes: t.Optional(t.String()),
+                priority: t.Optional(t.String()),
+              }),
+            }
+          )
           .post('/todos/:id/complete', async ({ c, params }) => {
             await c.todosUseCase.completeByIdOrIndex(params.id);
             return { ok: true };
@@ -95,6 +121,15 @@ new Elysia()
   )
 
   // SPA fallback — static files and index.html
-  .all('/*', ({ request }) => serveStatic(new URL(request.url).pathname))
+  .all('/*', ({ request }) => {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === '/api' || pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'Not Found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return serveStatic(pathname);
+  })
 
   .listen(PORT, () => console.log(`Pax web server: http://localhost:${PORT}`));
