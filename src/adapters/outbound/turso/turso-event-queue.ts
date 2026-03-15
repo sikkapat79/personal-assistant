@@ -10,7 +10,10 @@ import type { TursoDb } from './client';
 import { events, snapshotTodos, snapshotLogs, entityIdMap } from './schema';
 
 export class TursoEventQueue implements IEventQueue {
-  constructor(private readonly db: TursoDb) {}
+  constructor(
+    private readonly db: TursoDb,
+    private readonly userId: string,
+  ) {}
 
   /** Run Drizzle migrations. Must be called once at startup before any other method. */
   async initialize(): Promise<void> {
@@ -31,31 +34,32 @@ export class TursoEventQueue implements IEventQueue {
         timestamp: event.timestamp,
         deviceId: event.device_id,
         synced: event.synced,
+        userId: this.userId,
       })
       .onConflictDoNothing();
   }
 
   async pendingSync(): Promise<StoredEvent[]> {
-    // Event ids are UUID v7 — lexicographic order equals creation order.
-    // Sorting by id gives deterministic replay even for events created within
-    // the same millisecond (where timestamp alone would be a tie).
     const rows = await this.db
       .select()
       .from(events)
-      .where(eq(events.synced, 0))
+      .where(and(eq(events.synced, 0), eq(events.userId, this.userId)))
       .orderBy(asc(events.id));
     return rows.map(rowToStoredEvent);
   }
 
   async markSynced(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
-    await this.db.update(events).set({ synced: 1 }).where(inArray(events.id, ids));
+    await this.db
+      .update(events)
+      .set({ synced: 1 })
+      .where(and(inArray(events.id, ids), eq(events.userId, this.userId)));
   }
 
   async loadSnapshot(): Promise<{ todos: Todo[]; logs: DailyLog[] }> {
     const [todoRows, logRows] = await Promise.all([
-      this.db.select().from(snapshotTodos),
-      this.db.select().from(snapshotLogs),
+      this.db.select().from(snapshotTodos).where(eq(snapshotTodos.userId, this.userId)),
+      this.db.select().from(snapshotLogs).where(eq(snapshotLogs.userId, this.userId)),
     ]);
     return {
       todos: todoRows.map((row) => JSON.parse(row.data) as Todo),
@@ -70,41 +74,50 @@ export class TursoEventQueue implements IEventQueue {
       if (todos.length > 0) {
         const todoRows = todos.map((todo) => {
           if (!todo.id) throw new Error('Snapshot received a todo with no id — invariant violation');
-          return { notionId: todo.id, data: JSON.stringify(todo), fetchedAt: now };
+          return { notionId: todo.id, data: JSON.stringify(todo), fetchedAt: now, userId: this.userId };
         });
         await tx
           .insert(snapshotTodos)
           .values(todoRows)
           .onConflictDoUpdate({
-            target: snapshotTodos.notionId,
+            target: [snapshotTodos.userId, snapshotTodos.notionId],
             set: { data: sql`excluded.data`, fetchedAt: sql`excluded.fetched_at` },
           });
       }
 
       if (logs.length > 0) {
-        const logRows = logs.map((log) => ({ date: log.date, data: JSON.stringify(log), fetchedAt: now }));
+        const logRows = logs.map((log) => ({
+          date: log.date,
+          data: JSON.stringify(log),
+          fetchedAt: now,
+          userId: this.userId,
+        }));
         await tx
           .insert(snapshotLogs)
           .values(logRows)
           .onConflictDoUpdate({
-            target: snapshotLogs.date,
+            target: [snapshotLogs.userId, snapshotLogs.date],
             set: { data: sql`excluded.data`, fetchedAt: sql`excluded.fetched_at` },
           });
       }
 
-      // Prune rows that no longer exist in Notion
+      // Prune rows that no longer exist in Notion — scoped to this user only
       if (todos.length === 0) {
-        await tx.delete(snapshotTodos);
+        await tx.delete(snapshotTodos).where(eq(snapshotTodos.userId, this.userId));
       } else {
         const ids = todos.map((t) => t.id!);
-        await tx.delete(snapshotTodos).where(notInArray(snapshotTodos.notionId, ids));
+        await tx
+          .delete(snapshotTodos)
+          .where(and(eq(snapshotTodos.userId, this.userId), notInArray(snapshotTodos.notionId, ids)));
       }
 
       if (logs.length === 0) {
-        await tx.delete(snapshotLogs);
+        await tx.delete(snapshotLogs).where(eq(snapshotLogs.userId, this.userId));
       } else {
         const dates = logs.map((l) => l.date);
-        await tx.delete(snapshotLogs).where(notInArray(snapshotLogs.date, dates));
+        await tx
+          .delete(snapshotLogs)
+          .where(and(eq(snapshotLogs.userId, this.userId), notInArray(snapshotLogs.date, dates)));
       }
     });
   }
@@ -113,15 +126,18 @@ export class TursoEventQueue implements IEventQueue {
     const now = new Date().toISOString();
     await this.db
       .insert(snapshotLogs)
-      .values({ date: log.date, data: JSON.stringify(log), fetchedAt: now })
+      .values({ date: log.date, data: JSON.stringify(log), fetchedAt: now, userId: this.userId })
       .onConflictDoUpdate({
-        target: snapshotLogs.date,
+        target: [snapshotLogs.userId, snapshotLogs.date],
         set: { data: JSON.stringify(log), fetchedAt: now },
       });
   }
 
   async getEntityIdMap(): Promise<EntityIdMap> {
-    const rows = await this.db.select().from(entityIdMap);
+    const rows = await this.db
+      .select()
+      .from(entityIdMap)
+      .where(eq(entityIdMap.userId, this.userId));
     const map = new EntityIdMap();
     for (const row of rows) {
       map.set(row.localId, row.notionId);
@@ -132,20 +148,24 @@ export class TursoEventQueue implements IEventQueue {
   async persistEntityIdMapping(localId: string, notionId: string): Promise<void> {
     await this.db
       .insert(entityIdMap)
-      .values({ localId, notionId })
+      .values({ localId, notionId, userId: this.userId })
       .onConflictDoUpdate({
-        target: entityIdMap.localId,
+        target: [entityIdMap.userId, entityIdMap.localId],
         set: { notionId },
       });
   }
 
   async listCompletedTodayIds(sinceUtc: string): Promise<string[]> {
-    // sinceUtc is start of local today in UTC (e.g. '2026-03-13T07:00:00.000Z' for UTC+7)
-    // No upper bound needed — tasks cannot be marked done in the future
     const rows = await this.db
       .selectDistinct({ entityId: events.entityId })
       .from(events)
-      .where(and(eq(events.eventType, EventType.TodoCompleted), gte(events.timestamp, sinceUtc)));
+      .where(
+        and(
+          eq(events.eventType, EventType.TodoCompleted),
+          gte(events.timestamp, sinceUtc),
+          eq(events.userId, this.userId),
+        )
+      );
     return rows.map((r) => r.entityId);
   }
 
@@ -153,7 +173,7 @@ export class TursoEventQueue implements IEventQueue {
     const rows = await this.db
       .select()
       .from(events)
-      .where(eq(events.entityId, entityId))
+      .where(and(eq(events.entityId, entityId), eq(events.userId, this.userId)))
       .orderBy(asc(events.id));
     return rows.map(rowToStoredEvent);
   }

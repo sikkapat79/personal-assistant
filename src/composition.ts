@@ -19,6 +19,7 @@ import { getOrCreateMetadataDatabaseId } from './config/ensure-metadata-database
 import { SqliteSessionSummaryStore } from './adapters/outbound/local/sqlite-session-summary-store';
 import { TursoEventQueue } from './adapters/outbound/turso/turso-event-queue';
 import { createTursoDb } from './adapters/outbound/turso/client';
+import type { TursoDb } from './adapters/outbound/turso/client';
 import { LocalProjection } from './adapters/outbound/local/local-projection';
 import { LocalLogsAdapter } from './adapters/outbound/local/local-logs-adapter';
 import { LocalTodosAdapter } from './adapters/outbound/local/local-todos-adapter';
@@ -68,7 +69,8 @@ export async function compose(): Promise<Composition> {
   const tursoUrl = settings.TURSO_URL ?? '';
   const tursoToken = settings.TURSO_TOKEN ?? '';
   const db = createTursoDb({ tursoUrl, tursoToken, mode: 'embedded', localDbPath: dbPath });
-  const eventQueue = new TursoEventQueue(db);
+  // TUI runs as the owner on a local device — isolated from web user_id space
+  const eventQueue = new TursoEventQueue(db, '__tui__');
   await eventQueue.initialize();
 
   // Session store stays on a separate local SQLite file — session data is device-local only
@@ -77,9 +79,8 @@ export async function compose(): Promise<Composition> {
   const projection = new LocalProjection();
   const deviceId = getDeviceId();
 
-  // Start the background sync engine
+  // Start the background sync engine (started after setup completes — prevents orphaned intervals)
   const syncEngine = new SyncEngine(eventQueue, notionLogs, notionTodos);
-  syncEngine.start();
 
   // Construct adapters before replaying events — handlers must be registered first
   const logs = new LocalLogsAdapter(eventQueue, projection, syncEngine, deviceId);
@@ -96,6 +97,10 @@ export async function compose(): Promise<Composition> {
   projection.loadFromSnapshot(cachedSnapshot);
   projection.applyAll(pendingEvents);
 
+  // Start the background sync engine after all adapters and projection are set up
+  // — prevents orphaned intervals if setup throws
+  syncEngine.start();
+
   // Re-hydrate from Notion in the background — does not block app startup
   hydrateFromNotion(eventQueue, projection, notionLogs, notionTodos).catch((err: unknown) => {
     console.error('[compose] Background Notion hydration failed:', err instanceof Error ? err.message : String(err));
@@ -110,5 +115,102 @@ export async function compose(): Promise<Composition> {
       ? new OpenAILLMAdapter(apiKey, settings.OPENAI_MODEL ?? undefined)
       : new StubLLMAdapter();
   const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore, sessionStore);
+  return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
+}
+
+/**
+ * Build a Composition scoped to a specific web user.
+ * Owner gets full Notion sync; family members get Turso-only (no Notion).
+ * Called by the web server — migrations must already have run before this.
+ */
+export async function composeForUser(
+  db: TursoDb,
+  userId: string,
+  isOwner: boolean,
+): Promise<Composition> {
+  const eventQueue = new TursoEventQueue(db, userId);
+  const projection = new LocalProjection();
+  const deviceId = getDeviceId();
+
+  if (isOwner) {
+    const { settings } = getResolvedConfig();
+    const metadataDbId = await getOrCreateMetadataDatabaseId(settings);
+    const metadataStore: IMetadataStore =
+      metadataDbId && settings.NOTION_API_KEY
+        ? new NotionMetadataStore(getNotionClient(settings.NOTION_API_KEY), metadataDbId)
+        : new FileMetadataStore();
+    await ensureMetadataBootstrapped(metadataStore, settings);
+    const scope = metadataStore.getAllowedNotionScope();
+    const config =
+      scope?.logsColumns && scope?.todosColumns && scope?.todosDoneKind && settings.NOTION_API_KEY
+        ? buildNotionConfigFromScope(scope, settings.NOTION_API_KEY)
+        : buildNotionConfigFromResolved(settings);
+    const client = getNotionClient(config.apiKey);
+    const notionLogs = new NotionLogsAdapter(client, config.db.logs.databaseId, config.db.logs.columns);
+    const notionTodos = new NotionTodosAdapter(
+      client,
+      config.db.todos.databaseId,
+      config.db.todos.columns,
+      config.db.todos.doneKind
+    );
+    const syncEngine = new SyncEngine(eventQueue, notionLogs, notionTodos);
+    const logs = new LocalLogsAdapter(eventQueue, projection, syncEngine, deviceId);
+    const todos = new LocalTodosAdapter(eventQueue, projection, syncEngine, deviceId);
+    const [cachedSnapshot, pendingEvents] = await Promise.all([
+      eventQueue.loadSnapshot(),
+      eventQueue.pendingSync(),
+    ]);
+    projection.loadFromSnapshot(cachedSnapshot);
+    projection.applyAll(pendingEvents);
+    hydrateFromNotion(eventQueue, projection, notionLogs, notionTodos).catch((err: unknown) => {
+      console.error(
+        '[composeForUser/owner] Notion hydration failed:',
+        err instanceof Error ? err.message : String(err)
+      );
+    });
+    const sessionStore = new SqliteSessionSummaryStore(join(getConfigDir(), 'session.db'));
+    const context = new FilesystemContextAdapter();
+    const apiKey = settings.OPENAI_API_KEY;
+    const llm =
+      apiKey && apiKey.length > 0
+        ? new OpenAILLMAdapter(apiKey, settings.OPENAI_MODEL ?? undefined)
+        : new StubLLMAdapter();
+    const logUseCase = new LogUseCase(logs);
+    const todosUseCase = new TodosUseCase(todos);
+    const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore, sessionStore);
+    // Start sync after all composition succeeds — prevents orphaned intervals if setup throws
+    syncEngine.start();
+    return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
+  }
+
+  // Family member: Turso-only, no Notion sync.
+  // nudge() is a no-op so member events are stored locally but never pushed to Notion.
+  const noopSync = {
+    start: () => {},
+    stop: () => {},
+    nudge: () => {},
+    flush: async () => {},
+  } as unknown as SyncEngine;
+  const logs = new LocalLogsAdapter(eventQueue, projection, noopSync, deviceId);
+  const todos = new LocalTodosAdapter(eventQueue, projection, noopSync, deviceId);
+  const [cachedSnapshot, pendingEvents] = await Promise.all([
+    eventQueue.loadSnapshot(),
+    eventQueue.pendingSync(),
+  ]);
+  projection.loadFromSnapshot(cachedSnapshot);
+  projection.applyAll(pendingEvents);
+  const metadataStore = new FileMetadataStore();
+  const sessionStore = new SqliteSessionSummaryStore(join(getConfigDir(), 'session.db'));
+  const context = new FilesystemContextAdapter();
+  const logUseCase = new LogUseCase(logs);
+  const todosUseCase = new TodosUseCase(todos);
+  const agentUseCase = new AgentUseCase(
+    logs,
+    todos,
+    context,
+    new StubLLMAdapter(),
+    metadataStore,
+    sessionStore
+  );
   return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
 }

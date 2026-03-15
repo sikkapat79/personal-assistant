@@ -35,6 +35,12 @@ export interface Settings {
   OPENAI_MODEL?: string;
   TURSO_URL?: string;
   TURSO_TOKEN?: string;
+  OWNER_EMAIL?: string;
+  BETTER_AUTH_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  LINE_CLIENT_ID?: string;
+  LINE_CLIENT_SECRET?: string;
 }
 
 const FILENAME = 'settings.json';

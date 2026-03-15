@@ -35,36 +35,50 @@ export interface UpdateTodoInput {
   priority?: TodoPriority;
 }
 
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  image?: string | null;
+}
+
+export interface SessionResponse {
+  user: SessionUser;
+  session: { id: string; expiresAt: string };
+}
+
+class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 class ApiClient {
   private readonly base: string;
-  private readonly token: string;
 
   constructor() {
     this.base = import.meta.env.VITE_API_URL ?? '';
-    // TODO(#21): VITE_API_TOKEN is a temporary dev-only scaffold — a bearer token
-    // baked into the client bundle is not suitable for production. Once Better Auth
-    // is implemented (#21), auth will use httpOnly session cookies issued by the
-    // server and this env var (and the Authorization header below) can be removed.
-    this.token = import.meta.env.VITE_API_TOKEN ?? '';
   }
 
-  private headers(): HeadersInit {
-    return {
-      'Content-Type': 'application/json',
-      ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-    };
-  }
-
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${this.base}${path}`, {
-      ...init,
-      headers: { ...this.headers(), ...(init?.headers ?? {}) },
-    });
+  private async request<Value>(path: string, init: RequestInit = {}): Promise<Value> {
+    const headers = new Headers(init.headers);
+    if (init.body != null && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    const res = await fetch(`${this.base}${path}`, { ...init, credentials: 'include', headers });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`API ${init?.method ?? 'GET'} ${path} → ${res.status}: ${text}`);
+      throw new ApiError(`API ${init?.method ?? 'GET'} ${path} → ${res.status}: ${text}`, res.status);
     }
-    return res.json() as Promise<T>;
+    return res.json() as Promise<Value>;
+  }
+
+  getSession(): Promise<SessionResponse | null> {
+    return this.request<SessionResponse | null>('/api/auth/get-session').catch((err: unknown) => {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return null;
+      throw err;
+    });
   }
 
   getToday(): Promise<TodayResponse> {
