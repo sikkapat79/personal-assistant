@@ -79,9 +79,8 @@ export async function compose(): Promise<Composition> {
   const projection = new LocalProjection();
   const deviceId = getDeviceId();
 
-  // Start the background sync engine
+  // Start the background sync engine (started after setup completes — prevents orphaned intervals)
   const syncEngine = new SyncEngine(eventQueue, notionLogs, notionTodos);
-  syncEngine.start();
 
   // Construct adapters before replaying events — handlers must be registered first
   const logs = new LocalLogsAdapter(eventQueue, projection, syncEngine, deviceId);
@@ -97,6 +96,10 @@ export async function compose(): Promise<Composition> {
   ]);
   projection.loadFromSnapshot(cachedSnapshot);
   projection.applyAll(pendingEvents);
+
+  // Start the background sync engine after all adapters and projection are set up
+  // — prevents orphaned intervals if setup throws
+  syncEngine.start();
 
   // Re-hydrate from Notion in the background — does not block app startup
   hydrateFromNotion(eventQueue, projection, notionLogs, notionTodos).catch((err: unknown) => {

@@ -1,5 +1,6 @@
 import type { TodoAddInputDto } from '@app/todo/todo-dto';
 import type { TodoUpdatePatch } from '@app/todo/todo-update-patch';
+import { TODO_PRIORITIES } from '@domain/todo/todo';
 import { join, resolve, relative } from 'path';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import { Elysia, t } from 'elysia';
@@ -8,6 +9,8 @@ import { getResolvedConfig } from '../../../../config/resolved';
 import { getConfigDir } from '../../../../config/config-dir';
 import { createAuth } from './auth';
 import { getCompositionForUser } from './user-composition';
+
+const TODO_STATUS_VALUES = ['Todo', 'In Progress', 'Done'];
 
 const PORT = Number(process.env.PORT ?? 3001);
 const PUBLIC_DIR = join(import.meta.dir, 'public');
@@ -52,20 +55,23 @@ new Elysia()
   .group('/api', (api) =>
     api.guard(
       {
-        beforeHandle: async ({ request }) => {
+        beforeHandle: async ({ request, store }) => {
           const session = await auth.api.getSession({ headers: request.headers });
           if (!session)
             return new Response(JSON.stringify({ error: 'Unauthorized' }), {
               status: 401,
               headers: { 'Content-Type': 'application/json' },
             });
+          // Store session in request context to avoid re-fetching in resolve
+          (store as { session?: typeof session }).session = session;
         },
       },
       (guarded) =>
         guarded
-          // resolve runs after beforeHandle — session is guaranteed valid here
-          .resolve(async ({ request }) => {
-            const session = (await auth.api.getSession({ headers: request.headers }))!;
+          // resolve runs after beforeHandle — session is guaranteed valid and stored in context
+          .resolve(async ({ store }) => {
+            const stored = store as { session?: { user: { id: string; email: string } } };
+            const session = stored.session!;
             const { id: userId, email } = session.user;
             const isOwner = email.toLowerCase() === OWNER_EMAIL;
             const c = await getCompositionForUser(db, userId, isOwner);
@@ -91,8 +97,8 @@ new Elysia()
                 dueDate: t.Optional(t.Nullable(t.String())),
                 category: t.Optional(t.String()),
                 notes: t.Optional(t.String()),
-                priority: t.Optional(t.String()),
-                status: t.Optional(t.String()),
+                priority: t.Optional(t.Union(TODO_PRIORITIES.map((p) => t.Literal(p)))),
+                status: t.Optional(t.Union(TODO_STATUS_VALUES.map((s) => t.Literal(s)))),
               }),
             }
           )
@@ -106,10 +112,10 @@ new Elysia()
               body: t.Object({
                 title: t.Optional(t.String()),
                 dueDate: t.Optional(t.Nullable(t.String())),
-                status: t.Optional(t.String()),
+                status: t.Optional(t.Union(TODO_STATUS_VALUES.map((s) => t.Literal(s)))),
                 category: t.Optional(t.String()),
                 notes: t.Optional(t.String()),
-                priority: t.Optional(t.String()),
+                priority: t.Optional(t.Union(TODO_PRIORITIES.map((p) => t.Literal(p)))),
               }),
             }
           )
