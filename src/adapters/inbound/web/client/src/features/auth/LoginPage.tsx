@@ -6,12 +6,20 @@ const ERROR_MESSAGES: Record<string, string> = {
   default: 'Sign-in failed. Please try again.',
 };
 
-async function signInWithLine() {
-  const res = await fetch('/api/auth/sign-in/oauth2', {
+async function signInWith(provider: 'google' | 'line') {
+  const endpoint =
+    provider === 'google' ? '/api/auth/sign-in/social' : '/api/auth/sign-in/oauth2';
+  const callbackURL = window.location.origin + '/';
+  const body =
+    provider === 'google'
+      ? { provider: 'google', callbackURL }
+      : { providerId: 'line', callbackURL };
+
+  const res = await fetch(endpoint, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ providerId: 'line', callbackURL: '/' }),
+    body: JSON.stringify(body),
   });
   const data = (await res.json()) as { url?: string };
   if (data.url) {
@@ -38,11 +46,8 @@ export function LoginPage() {
           </div>
         )}
         <div className="flex flex-col gap-3">
-          <OAuthButton
-            provider="google"
-            href="/api/auth/sign-in/social?provider=google&callbackURL=/"
-          />
-          <OAuthButton provider="line" onClick={signInWithLine} />
+          <OAuthButton provider="google" onClick={() => signInWith('google')} />
+          <OAuthButton provider="line" onClick={() => signInWith('line')} />
         </div>
       </div>
     </div>

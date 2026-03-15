@@ -3,7 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { genericOAuth, line } from 'better-auth/plugins/generic-oauth';
 import { eq, isNull } from 'drizzle-orm';
 import type { TursoDb } from '../../../../adapters/outbound/turso/client';
-import { events, snapshotTodos, snapshotLogs, entityIdMap, invites } from '../../../../adapters/outbound/turso/schema';
+import { events, snapshotTodos, snapshotLogs, entityIdMap, invites, users, sessions, accounts, verifications } from '../../../../adapters/outbound/turso/schema';
 
 export function createAuth(db: TursoDb) {
   const ownerEmail = process.env.OWNER_EMAIL ?? '';
@@ -13,7 +13,10 @@ export function createAuth(db: TursoDb) {
 
   return betterAuth({
     secret,
-    database: drizzleAdapter(db, { provider: 'sqlite' }),
+    database: drizzleAdapter(db, {
+      provider: 'sqlite',
+      schema: { user: users, session: sessions, account: accounts, verification: verifications },
+    }),
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID ?? '',
