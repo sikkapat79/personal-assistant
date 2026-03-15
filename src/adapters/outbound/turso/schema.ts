@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, primaryKey } from 'drizzle-orm/sqlite-core';
 
 // ─── App tables ──────────────────────────────────────────────────────────────
 
@@ -19,28 +19,41 @@ export const events = sqliteTable(
     index('idx_events_unsynced').on(t.synced, t.id),
     index('idx_events_type_timestamp').on(t.eventType, t.timestamp),
     index('idx_events_entity_id_id').on(t.entityId, t.id),
+    index('idx_events_user_id').on(t.userId),
   ]
 );
 
-export const snapshotTodos = sqliteTable('snapshot_todos', {
-  notionId: text('notion_id').primaryKey(),
-  data: text('data').notNull(),
-  fetchedAt: text('fetched_at').notNull(),
-  userId: text('user_id'),
-});
+export const snapshotTodos = sqliteTable(
+  'snapshot_todos',
+  {
+    userId: text('user_id').notNull(),
+    notionId: text('notion_id').notNull(),
+    data: text('data').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.notionId] })]
+);
 
-export const snapshotLogs = sqliteTable('snapshot_logs', {
-  date: text('date').primaryKey(),
-  data: text('data').notNull(),
-  fetchedAt: text('fetched_at').notNull(),
-  userId: text('user_id'),
-});
+export const snapshotLogs = sqliteTable(
+  'snapshot_logs',
+  {
+    userId: text('user_id').notNull(),
+    date: text('date').notNull(),
+    data: text('data').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.date] })]
+);
 
-export const entityIdMap = sqliteTable('entity_id_map', {
-  localId: text('local_id').primaryKey(),
-  notionId: text('notion_id').notNull(),
-  userId: text('user_id'),
-});
+export const entityIdMap = sqliteTable(
+  'entity_id_map',
+  {
+    userId: text('user_id').notNull(),
+    localId: text('local_id').notNull(),
+    notionId: text('notion_id').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.localId] })]
+);
 
 export const invites = sqliteTable('invites', {
   email: text('email').primaryKey(),

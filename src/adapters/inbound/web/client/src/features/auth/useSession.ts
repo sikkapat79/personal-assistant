@@ -15,7 +15,10 @@ export function useSession(): UseSessionResult {
     apiClient
       .getSession()
       .then((data) => setUser(data?.user ?? null))
-      .catch(() => setUser(null))
+      .catch((err: unknown) => {
+        console.error('[auth] Session fetch failed:', err);
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 

@@ -151,7 +151,6 @@ export async function composeForUser(
       config.db.todos.doneKind
     );
     const syncEngine = new SyncEngine(eventQueue, notionLogs, notionTodos);
-    syncEngine.start();
     const logs = new LocalLogsAdapter(eventQueue, projection, syncEngine, deviceId);
     const todos = new LocalTodosAdapter(eventQueue, projection, syncEngine, deviceId);
     const [cachedSnapshot, pendingEvents] = await Promise.all([
@@ -176,6 +175,8 @@ export async function composeForUser(
     const logUseCase = new LogUseCase(logs);
     const todosUseCase = new TodosUseCase(todos);
     const agentUseCase = new AgentUseCase(logs, todos, context, llm, metadataStore, sessionStore);
+    // Start sync after all composition succeeds — prevents orphaned intervals if setup throws
+    syncEngine.start();
     return { logs, todos, logUseCase, todosUseCase, agentUseCase, metadataStore };
   }
 

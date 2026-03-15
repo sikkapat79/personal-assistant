@@ -11,6 +11,15 @@ export function createAuth(db: TursoDb) {
   if (!secret) throw new Error('BETTER_AUTH_SECRET is required');
   if (!ownerEmail) throw new Error('OWNER_EMAIL is required');
 
+  const ownerEmailNormalized = ownerEmail.toLowerCase();
+
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.warn('[auth] Google OAuth credentials not configured');
+  }
+  if (!process.env.LINE_CLIENT_ID || !process.env.LINE_CLIENT_SECRET) {
+    console.warn('[auth] LINE OAuth credentials not configured');
+  }
+
   return betterAuth({
     secret,
     database: drizzleAdapter(db, {
@@ -38,11 +47,11 @@ export function createAuth(db: TursoDb) {
         create: {
           before: async (user) => {
             // Allow owner unconditionally; everyone else must be in the invites table
-            if (user.email !== ownerEmail) {
+            if (user.email.toLowerCase() !== ownerEmailNormalized) {
               const [invite] = await db
                 .select()
                 .from(invites)
-                .where(eq(invites.email, user.email))
+                .where(eq(invites.email, user.email.toLowerCase()))
                 .limit(1);
               if (!invite) {
                 throw new Error('not_invited');
@@ -51,13 +60,15 @@ export function createAuth(db: TursoDb) {
             return { data: user };
           },
           after: async (user) => {
-            // Owner first login: backfill all legacy rows that have no user_id
-            if (user.email === ownerEmail) {
+            // Owner first login: backfill all legacy rows that have no user_id.
+            // snapshot tables had NULL rows converted to '__unscoped__' by migration 0003;
+            // events table still uses NULL (no NOT NULL constraint added there).
+            if (user.email.toLowerCase() === ownerEmailNormalized) {
               try {
                 await db.update(events).set({ userId: user.id }).where(isNull(events.userId));
-                await db.update(snapshotTodos).set({ userId: user.id }).where(isNull(snapshotTodos.userId));
-                await db.update(snapshotLogs).set({ userId: user.id }).where(isNull(snapshotLogs.userId));
-                await db.update(entityIdMap).set({ userId: user.id }).where(isNull(entityIdMap.userId));
+                await db.update(snapshotTodos).set({ userId: user.id }).where(eq(snapshotTodos.userId, '__unscoped__'));
+                await db.update(snapshotLogs).set({ userId: user.id }).where(eq(snapshotLogs.userId, '__unscoped__'));
+                await db.update(entityIdMap).set({ userId: user.id }).where(eq(entityIdMap.userId, '__unscoped__'));
               } catch (err) {
                 console.error(
                   '[auth] CRITICAL: Owner data backfill failed —',

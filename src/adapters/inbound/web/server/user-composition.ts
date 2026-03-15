@@ -9,13 +9,14 @@ export function getCompositionForUser(
   userId: string,
   isOwner: boolean,
 ): Promise<Composition> {
-  let promise = cache.get(userId);
+  const cacheKey = `${userId}:${isOwner}`;
+  let promise = cache.get(cacheKey);
   if (!promise) {
     promise = composeForUser(db, userId, isOwner).catch((err: unknown) => {
-      cache.delete(userId);
+      cache.delete(cacheKey);
       throw err;
     });
-    cache.set(userId, promise);
+    cache.set(cacheKey, promise);
   }
   return promise;
 }

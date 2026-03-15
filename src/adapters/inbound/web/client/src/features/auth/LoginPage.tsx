@@ -21,9 +21,15 @@ async function signInWith(provider: 'google' | 'line') {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  if (!res.ok) {
+    console.error(`[auth] ${provider} sign-in request failed: ${res.status}`);
+    return;
+  }
   const data = (await res.json()) as { url?: string };
   if (data.url) {
     window.location.href = data.url;
+  } else {
+    console.error('[auth] Sign-in response missing redirect URL');
   }
 }
 

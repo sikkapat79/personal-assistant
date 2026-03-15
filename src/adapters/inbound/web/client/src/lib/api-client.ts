@@ -47,6 +47,13 @@ export interface SessionResponse {
   session: { id: string; expiresAt: string };
 }
 
+class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 class ApiClient {
   private readonly base: string;
 
@@ -54,7 +61,7 @@ class ApiClient {
     this.base = import.meta.env.VITE_API_URL ?? '';
   }
 
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
+  private async request<Value>(path: string, init?: RequestInit): Promise<Value> {
     const res = await fetch(`${this.base}${path}`, {
       ...init,
       credentials: 'include',
@@ -62,13 +69,16 @@ class ApiClient {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`API ${init?.method ?? 'GET'} ${path} → ${res.status}: ${text}`);
+      throw new ApiError(`API ${init?.method ?? 'GET'} ${path} → ${res.status}: ${text}`, res.status);
     }
-    return res.json() as Promise<T>;
+    return res.json() as Promise<Value>;
   }
 
   getSession(): Promise<SessionResponse | null> {
-    return this.request<SessionResponse | null>('/api/auth/get-session').catch(() => null);
+    return this.request<SessionResponse | null>('/api/auth/get-session').catch((err: unknown) => {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return null;
+      throw err;
+    });
   }
 
   getToday(): Promise<TodayResponse> {

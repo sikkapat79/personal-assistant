@@ -11,7 +11,7 @@ import { getCompositionForUser } from './user-composition';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const PUBLIC_DIR = join(import.meta.dir, 'public');
-const OWNER_EMAIL = process.env.OWNER_EMAIL ?? '';
+const OWNER_EMAIL = (process.env.OWNER_EMAIL ?? '').trim().toLowerCase();
 
 const { settings } = getResolvedConfig();
 const configDir = getConfigDir();
@@ -67,7 +67,7 @@ new Elysia()
           .resolve(async ({ request }) => {
             const session = (await auth.api.getSession({ headers: request.headers }))!;
             const { id: userId, email } = session.user;
-            const isOwner = email === OWNER_EMAIL;
+            const isOwner = email.toLowerCase() === OWNER_EMAIL;
             const c = await getCompositionForUser(db, userId, isOwner);
             return { c };
           })

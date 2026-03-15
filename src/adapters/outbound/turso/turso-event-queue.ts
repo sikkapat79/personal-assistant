@@ -80,7 +80,7 @@ export class TursoEventQueue implements IEventQueue {
           .insert(snapshotTodos)
           .values(todoRows)
           .onConflictDoUpdate({
-            target: snapshotTodos.notionId,
+            target: [snapshotTodos.userId, snapshotTodos.notionId],
             set: { data: sql`excluded.data`, fetchedAt: sql`excluded.fetched_at` },
           });
       }
@@ -96,7 +96,7 @@ export class TursoEventQueue implements IEventQueue {
           .insert(snapshotLogs)
           .values(logRows)
           .onConflictDoUpdate({
-            target: snapshotLogs.date,
+            target: [snapshotLogs.userId, snapshotLogs.date],
             set: { data: sql`excluded.data`, fetchedAt: sql`excluded.fetched_at` },
           });
       }
@@ -128,7 +128,7 @@ export class TursoEventQueue implements IEventQueue {
       .insert(snapshotLogs)
       .values({ date: log.date, data: JSON.stringify(log), fetchedAt: now, userId: this.userId })
       .onConflictDoUpdate({
-        target: snapshotLogs.date,
+        target: [snapshotLogs.userId, snapshotLogs.date],
         set: { data: JSON.stringify(log), fetchedAt: now },
       });
   }
@@ -150,7 +150,7 @@ export class TursoEventQueue implements IEventQueue {
       .insert(entityIdMap)
       .values({ localId, notionId, userId: this.userId })
       .onConflictDoUpdate({
-        target: entityIdMap.localId,
+        target: [entityIdMap.userId, entityIdMap.localId],
         set: { notionId },
       });
   }
